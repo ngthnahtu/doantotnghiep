@@ -1,0 +1,20 @@
+import api from "./api"
+
+export const getInvoices = (page=1)=>{
+    return api.get(`/invoices?page=${page}`);
+}
+export const getInvoice = (id)=>{
+    return api.get(`/invoices/${id}`);
+}
+export const createInvoice = (data)=>{
+    return api.post("/invoices",data);
+}
+export const updateInvoice = (id, data)=>{
+    return api.put(`/invoices/${id}`,data);
+}
+export const deleteInvoice = (id) =>{
+    return api.delete(`/invoices/${id}`);
+}
+export const prepareInvoice = (billMonth)=>{
+    return api.get(`/invoices/prepare?bill_month=${billMonth}`);
+}
