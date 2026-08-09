@@ -35,12 +35,7 @@ export default function ContractModal({
                   <div>
                     <Label htmlFor="room_id">Phòng</Label>
 
-                    <select
-                      id="room_id"
-                      name="room_id"
-                      value={contractForm.room_id}
-                      onChange={handleFormChange}
-                      required
+                    <select id="room_id" name="room_id" value={contractForm.room_id} onChange={handleFormChange} required
                       className="w-full rounded-xl border border-slate-300 bg-white p-2 text-slate-900 outline-none focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     >
                       <option value="">-- Chọn phòng --</option>
@@ -56,16 +51,10 @@ export default function ContractModal({
                   <div>
                     <Label htmlFor="tenant_id">Khách thuê</Label>
 
-                    <select
-                      id="tenant_id"
-                      name="tenant_id"
-                      value={contractForm.tenant_id}
-                      onChange={handleFormChange}
-                      required
+                    <select  id="tenant_id" name="tenant_id" value={contractForm.tenant_id} onChange={handleFormChange} required
                       className="w-full rounded-xl border border-slate-300 bg-white p-2
                       text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100
-                      outline-none focus:border-blue-500"
-                    >
+                      outline-none focus:border-blue-500">
                       <option value="">-- Chọn khách thuê --</option>
 
                       {tenants.map((tenant) => (
@@ -96,13 +85,8 @@ export default function ContractModal({
                 <Label htmlFor="start_date">Ngày bắt đầu</Label>
 
                 {editingContract === null ? (
-                  <input
-                    id="start_date"
-                    name="start_date"
-                    type="date"
-                    value={contractForm.start_date}
-                    onChange={handleFormChange}
-                    required
+                  <input id="start_date" name="start_date" type="date" value={contractForm.start_date}
+                    onChange={handleFormChange}required
                     className="w-full rounded-xl border border-slate-300 p-2 outline-none focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 ) : (
@@ -115,13 +99,8 @@ export default function ContractModal({
               <div>
                 <Label htmlFor="end_date">Ngày hết hạn</Label>
 
-                <input
-                  id="end_date"
-                  name="end_date"
-                  type="date"
-                  value={contractForm.end_date}
-                  onChange={handleFormChange}
-                  required
+                <input id="end_date" name="end_date" type="date" value={contractForm.end_date}
+                  onChange={handleFormChange} required
                   className="w-full rounded-xl border border-slate-300 p-2 outline-none focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
@@ -133,13 +112,9 @@ export default function ContractModal({
 
                 {editingContract === null ? (
                   <input
-                    id="rent_price"
-                    name="rent_price"
-                    type="number"
-                    min="0"
+                    id="rent_price" name="rent_price" type="number" min="0"
                     value={contractForm.rent_price}
-                    onChange={handleFormChange}
-                    required
+                    onChange={handleFormChange} required
                     className="w-full rounded-xl border border-slate-300 p-2 outline-none focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 ) : (
@@ -154,10 +129,7 @@ export default function ContractModal({
 
                 {editingContract === null ? (
                   <input
-                    id="deposit"
-                    name="deposit"
-                    type="number"
-                    min="0"
+                    id="deposit" name="deposit" type="number" min="0"
                     value={contractForm.deposit}
                     onChange={handleFormChange}
                     required
@@ -174,10 +146,7 @@ export default function ContractModal({
             <div>
               <Label htmlFor="note">Ghi chú</Label>
 
-              <textarea
-                id="note"
-                name="note"
-                rows="2"
+              <textarea id="note" name="note" rows="2"
                 value={contractForm.note}
                 onChange={handleFormChange}
                 placeholder="Nhập ghi chú nếu có..."
@@ -196,18 +165,14 @@ export default function ContractModal({
                 });
 
                 return (
-                  <div
-                    key={service.id}
-                    className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700"
-                  >
+                  <div key={service.id}
+                    className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
                     <input
-                      type="checkbox"
-                      checked={selectedService !== undefined}
+                      className="h-4 w-4 shrink-0"
+                      type="checkbox" checked={selectedService !== undefined}
                       onChange={(event) => {
                         handleServiceCheck(service, event.target.checked);
-                      }}
-                      className="h-4 w-4 shrink-0"
-                    />
+                      }}/>
 
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{service.name}</p>

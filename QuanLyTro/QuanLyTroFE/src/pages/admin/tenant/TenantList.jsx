@@ -7,24 +7,15 @@ import ContentLayout from "../../../layouts/ContentLayout";
 import Button from "../../../components/common/Button";
 import { TableLayout, Tbody, Td, Th, Thead, Tr } from "../../../components/common/TableLayout";
 import { formatDate } from "../../../utils/formatDate";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Search, Trash2, X } from "lucide-react";
 import Paginate from "../../../components/common/Paginate";
 import Modal from "../../../components/common/Modal";
 import Label from "../../../components/common/Label";
 import Input from "../../../components/common/Input";
 import TenantView from "./TenantView";
 
-const initialTenantForm = {
-  name: "",
-  birth: "",
-  gender: 0,
-  address: "",
-  phone: "",
-  identity_number: "",
-  status: 0,
-  email: "",
-  password: "",
-  is_active: "1",
+const initialTenantForm = { name: "", birth: "", gender: 0, address: "", phone: "", identity_number: "", status: 0,
+  email: "", password: "", is_active: "1",
 };
 
 const genderList = ["Nam", "Nữ"];
@@ -39,6 +30,10 @@ export default function TenantList() {
   const [totalPage, setTotalPage] = useState(1);
   const [tenants, setTenants] = useState([]);
 
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter,setFilter]=useState("");
+
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [tenantForm, setTenantForm] = useState(initialTenantForm);
   const [editingTenantId, setEditingTenantId] = useState(null);
@@ -50,13 +45,29 @@ export default function TenantList() {
   const [viewingTenant, setViewingTenant] = useState(null);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      setSearch(keyword.trim());
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  useEffect(() => {
     fetchTenant();
-  }, [page]);
+  }, [page, search, filter]);
+
+  const clearSearch = () => {
+    setSearch("");
+    setKeyword("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
 
   const fetchTenant = async () => {
     try {
       setIsLoading(true);
-      const response = await getTenants(page);
+      const response = await getTenants(page,search, filter);
 
       setTenants(response.data.data.data);
       setTotalPage(response.data.data.last_page);
@@ -195,10 +206,6 @@ export default function TenantList() {
     }
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   return (
     <>
       <ConfirmDialog
@@ -216,11 +223,48 @@ export default function TenantList() {
 
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <ContentLayout title="Quản lý khách thuê" action={<Button onClick={openCreateModal}>Thêm mới</Button>}>
+      <ContentLayout
+        title="Quản lý khách thuê"
+        action={<Button onClick={openCreateModal}>Thêm mới</Button>}
+        toolbar={
+          <div className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 dark:border-slate-600 dark:bg-slate-800">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword &&
+             <button onClick={clearSearch}>
+              <X/>
+             </button>
+            }
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chưa thuê</option>
+            <option value="1">Đang thuê</option>
+            <option value="2">Đã chuyển đi</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
-              <Th>ID</Th>
               <Th>Tên</Th>
               <Th>Ngày sinh</Th>
               <Th>Giới tính</Th>
@@ -231,14 +275,21 @@ export default function TenantList() {
           </Thead>
 
           <Tbody>
-            {tenants.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={7}>Chưa có dữ liệu</Td>
+                <td className="text-center" colSpan={6}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : tenants.length === 0 ? (
+              <Tr>
+                <td className="text-center text-lg p-3" colSpan={6}>Chưa có dữ liệu</td>
               </Tr>
             ) : (
-              tenants.map((tenant) => (
+              tenants.map((tenant) => {
+                const canDelete = tenant?.status !== 1;
+              return(
                 <Tr key={tenant.id}>
-                  <Td>{tenant.id}</Td>
 
                   <Td>{tenant.name}</Td>
 
@@ -285,7 +336,8 @@ export default function TenantList() {
                       <button
                         type="button"
                         title="Xóa"
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={!canDelete}
                         onClick={() => setDeletingTenant(tenant)}
                       >
                         <Trash2 size={20} />
@@ -293,7 +345,8 @@ export default function TenantList() {
                     </div>
                   </Td>
                 </Tr>
-              ))
+              );
+            })
             )}
           </Tbody>
         </TableLayout>

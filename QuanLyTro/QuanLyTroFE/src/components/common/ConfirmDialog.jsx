@@ -13,7 +13,7 @@ function ConfirmDialog({
   }
 
   return (
-    <div className="fixed top-0 left-0 flex h-screen w-full items-center justify-center bg-black/30">
+    <div className="fixed z-60 top-0 left-0 flex h-screen w-full items-center justify-center bg-black/30">
       <div className="w-full max-w-md rounded-2xl bg-white p-5 text-slate-900 shadow dark:bg-slate-900 dark:text-slate-200">
         <h2 className="mb-1 text-xl font-semibold">{title}</h2>
 

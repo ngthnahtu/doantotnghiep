@@ -206,18 +206,11 @@ export default function Setting() {
 
   return (
     <>
-      {toast && (
-        <Toast
-          title={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <ContentLayout title="Cài đặt">
         <div className="flex flex-col gap-4 p-4">
           <div className="grid grid-cols-2 gap-4">
-            {/* THÔNG TIN TÀI KHOẢN */}
             <form
               onSubmit={handleUpdateAccount}
               className="rounded-xl border border-slate-300 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -232,7 +225,7 @@ export default function Setting() {
                   <Input
                     id="phone"
                     name="phone"
-                    readOnly
+                    readOnly={!isAdmin}
                     value={accountForm.phone}
                     onChange={handleAccountChange}
                     disabled={!isAdmin}
@@ -260,7 +253,6 @@ export default function Setting() {
               </div>
             </form>
 
-            {/* ĐỔI MẬT KHẨU */}
             <form
               onSubmit={handleUpdatePassword}
               className="rounded-xl border border-slate-300 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -315,29 +307,26 @@ export default function Setting() {
             </form>
           </div>
 
-          {/* CÀI ĐẶT HỆ THỐNG */}
-          {isAdmin && (
+          {isAdmin ? (
             <form
               onSubmit={handleUpdateSystem}
-              className="rounded-xl border border-slate-300 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            >
-              <div className="mb-4 flex items-center gap-2 border-b pb-2 dark:border-slate-700">
+              className="rounded-xl border border-slate-300 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <div className="mb-4 border-b pb-2 dark:border-slate-700">
                 <h2 className="font-semibold">Cài đặt hệ thống</h2>
               </div>
 
               <div className="mb-4 grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1">
+                <div>
                   <Label htmlFor="house_name">Tên nhà trọ</Label>
                   <Input
                     id="house_name"
                     name="house_name"
                     value={systemForm.house_name}
                     onChange={handleSystemChange}
-                    placeholder="Simple Home"
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div>
                   <Label htmlFor="house_phone">Số điện thoại</Label>
                   <Input
                     id="house_phone"
@@ -347,7 +336,7 @@ export default function Setting() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div>
                   <Label htmlFor="house_address">Địa chỉ</Label>
                   <Input
                     id="house_address"
@@ -359,18 +348,12 @@ export default function Setting() {
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1">
+                <div>
                   <Label htmlFor="bank_name">Tên ngân hàng</Label>
-                  <Input
-                    id="bank_name"
-                    name="bank_name"
-                    value={systemForm.bank_name}
-                    onChange={handleSystemChange}
-                    placeholder="vd: Vietcombank"
-                  />
+                  <Input id="bank_name" name="bank_name" value={systemForm.bank_name} onChange={handleSystemChange} />
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div>
                   <Label htmlFor="bank_number">Số tài khoản</Label>
                   <Input
                     id="bank_number"
@@ -380,7 +363,7 @@ export default function Setting() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div>
                   <Label htmlFor="bank_owner">Tên chủ tài khoản</Label>
                   <Input
                     id="bank_owner"
@@ -391,12 +374,44 @@ export default function Setting() {
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-end pt-3">
+              <div className="mt-4 flex justify-end">
                 <Button type="submit" disabled={saving !== ""}>
                   {saving === "system" ? "Đang lưu..." : "Lưu cài đặt"}
                 </Button>
               </div>
             </form>
+          ) : (
+            <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <div className="mb-4 border-b pb-2 dark:border-slate-700">
+                <h2 className="font-semibold">Thông tin nhà trọ</h2>
+              </div>
+
+              <div className="grid grid-cols-3 gap-5">
+                <p>
+                  Tên nhà trọ: <span className="font-semibold">{systemForm.house_name || "Chưa cập nhật"}</span>
+                </p>
+
+                <p>
+                  Số điện thoại: <span className="font-semibold">{systemForm.house_phone || "Chưa cập nhật"}</span>
+                </p>
+
+                <p>
+                  Địa chỉ: <span className="font-semibold">{systemForm.house_address || "Chưa cập nhật"}</span>
+                </p>
+
+                <p>
+                  Ngân hàng: <span className="font-semibold">{systemForm.bank_name || "Chưa cập nhật"}</span>
+                </p>
+
+                <p>
+                  Số tài khoản: <span className="font-semibold">{systemForm.bank_number || "Chưa cập nhật"}</span>
+                </p>
+
+                <p>
+                  Chủ tài khoản: <span className="font-semibold">{systemForm.bank_owner || "Chưa cập nhật"}</span>
+                </p>
+              </div>
+            </div>
           )}
         </div>
       </ContentLayout>

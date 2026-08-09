@@ -7,28 +7,20 @@ import Input from "../../../components/common/Input";
 import Label from "../../../components/common/Label";
 import Modal from "../../../components/common/Modal";
 
-const initialForm = {
-  title: "",
-  content: "",
-  type: 0,
-  target_type: true,
-  user_id: [],
-};
+const initialForm = { title: "", content: "", type: 0, target_type: true, user_id: [] };
 
 export default function NotificationFormModal({ isOpen, editing, onClose, onSaved, setToast }) {
   const [form, setForm] = useState(initialForm);
   const [users, setUsers] = useState([]);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const isEdit = editing !== null;
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (editing) {
       setForm({
         title: editing.title || "",
         content: editing.content || "",
-        type: Number(editing.type),
-        target_type: Number(editing.target_type) === 1,
+        type: editing.type || 0,
+        target_type: Boolean(editing.target_type),
         user_id: [],
       });
     } else {
@@ -37,56 +29,48 @@ export default function NotificationFormModal({ isOpen, editing, onClose, onSave
   }, [editing, isOpen]);
 
   useEffect(() => {
-    if (!form.target_type && users.length === 0) {
-      fetchUsers();
+    const loadUser = async () => {
+      try {
+        const response = await getNotificationUsers();
+        setUsers(response.data.data);
+      } catch (error) {
+        setToast({
+          type: "error",
+          message: "Không thể tải danh sách người dùng.",
+        });
+      }
+    };
+    if (form.target_type === false && users.length === 0) {
+      loadUser();
     }
   }, [form.target_type]);
-
-  const fetchUsers = async () => {
-    try {
-      const response = await getNotificationUsers();
-
-      setUsers(response.data.data || []);
-    } catch (error) {
-      setToast({
-        type: "error",
-        message: error.response?.data?.message || "Không thể tải danh sách người nhận.",
-      });
-    }
-  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setForm((previous) => ({
-      ...previous,
+    setForm({
+      ...form,
       [name]: name === "target_type" ? value === "true" : value,
-    }));
-  };
-
-  const handleUserCheck = (userId) => {
-    setForm((previous) => {
-      const isSelected = previous.user_id.includes(userId);
-
-      return {
-        ...previous,
-        user_id: isSelected ? previous.user_id.filter((id) => id !== userId) : [...previous.user_id, userId],
-      };
     });
   };
 
-  const getTenantName = (user) => {
-    if (Array.isArray(user.tenants)) {
-      return user.tenants[0]?.name || user.email;
-    }
+  const handleUserCheck = (userId) => {
+    const userIds = form.user_id.includes(userId)
+      ? 
+      form.user_id.filter((id) => id !== userId)
+      : 
+      [...form.user_id, userId];
 
-    return user.tenants?.name || user.email;
+    setForm({
+      ...form,
+      user_id: userIds,
+    });
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!isEdit && !form.target_type && form.user_id.length === 0) {
+    if (!editing && form.target_type === false && form.user_id.length === 0) {
       setToast({
         type: "error",
         message: "Vui lòng chọn người nhận.",
@@ -95,91 +79,68 @@ export default function NotificationFormModal({ isOpen, editing, onClose, onSave
       return;
     }
 
+    const data = {
+      title: form.title,
+      content: form.content,
+      type: Number(form.type),
+      target_type: form.target_type,
+    };
+    if (form.target_type === false) {
+      data.user_id = form.user_id;
+    }
+
     try {
-      setIsSaving(true);
+      setLoading(true);
 
-      if (isEdit) {
-        // Backend update chỉ nhận ba trường.
-        await updateNotification(editing.id, {
-          title: form.title,
-          content: form.content,
-          type: Number(form.type),
-        });
+      if (editing) {
+        await updateNotification(editing.id, data);
+
+        onSaved("Cập nhật thông báo thành công.");
       } else {
-        const data = {
-          title: form.title,
-          content: form.content,
-          type: Number(form.type),
-          target_type: form.target_type,
-        };
-
-        if (!form.target_type) {
-          data.user_id = form.user_id;
-        }
-
         await createNotification(data);
+
+        onSaved("Thêm thông báo thành công.");
+      }
+      onClose();
+    } catch (error) {
+      let message = "Không thể lưu thông báo.";
+
+      if (error.response && error.response.data) {
+        if (error.response.data.message) {
+          message = error.response.data.message;
+        }
       }
 
-      onClose();
-
-      await onSaved(isEdit ? "Cập nhật thông báo thành công." : "Thêm thông báo thành công.");
-    } catch (error) {
       setToast({
         type: "error",
-        message: error.response?.data?.message || "Không thể lưu thông báo.",
+        message: message,
       });
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
 
   return (
     <Modal
-      title={isEdit ? "Chỉnh sửa thông báo" : "Thêm thông báo mới"}
+      title={editing ? "Chỉnh sửa thông báo" : "Thêm thông báo"}
       isOpen={isOpen}
-      onClose={() => {
-        if (!isSaving) {
-          onClose();
-        }
-      }}
+      onClose={onClose}
       className="max-w-xl"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        {/* Hàng 1: Tiêu đề và loại thông báo */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label htmlFor="title">Tiêu đề</Label>
+        <div>
+          <Label htmlFor="title">Tiêu đề</Label>
 
-            <Input
-              id="title"
-              name="title"
-              value={form.title}
-              onChange={handleChange}
-              placeholder="Nhập tiêu đề"
-              maxLength={191}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="type">Loại thông báo</Label>
-
-            <select
-              id="type"
-              name="type"
-              value={form.type}
-              onChange={handleChange}
-              className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value={0}>Thông báo chung</option>
-              <option value={1}>Hợp đồng</option>
-              <option value={2}>Hóa đơn</option>
-              <option value={3}>Thanh toán</option>
-            </select>
-          </div>
+          <Input
+            id="title"
+            name="title"
+            value={form.title}
+            onChange={handleChange}
+            placeholder="Nhập tiêu đề"
+            required
+          />
         </div>
 
-        {/* Hàng 2: Nội dung */}
         <div>
           <Label htmlFor="content">Nội dung</Label>
 
@@ -189,13 +150,30 @@ export default function NotificationFormModal({ isOpen, editing, onClose, onSave
             value={form.content}
             onChange={handleChange}
             placeholder="Nhập nội dung"
-            maxLength={255}
-            rows={1}
-            className="w-full rounded-lg border border-slate-300 p-2 outline-none focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-          ></textarea>
+            rows={3}
+            className="w-full rounded-lg border p-2 dark:bg-slate-800"
+            required
+          />
         </div>
 
-        {/* Hàng 3: Đối tượng nhận */}
+        <div>
+          <Label htmlFor="type">Loại thông báo</Label>
+
+          <select
+            id="type"
+            name="type"
+            value={form.type}
+            onChange={handleChange}
+            className="w-full rounded-lg border p-2 dark:bg-slate-800"
+          >
+            <option value={0}>Thông báo chung</option>
+            <option value={1}>Hợp đồng</option>
+            <option value={2}>Hóa đơn</option>
+            <option value={3}>Thanh toán</option>
+            <option value={4}>Sự cố</option>
+          </select>
+        </div>
+
         <div>
           <Label htmlFor="target_type">Đối tượng nhận</Label>
 
@@ -204,53 +182,45 @@ export default function NotificationFormModal({ isOpen, editing, onClose, onSave
             name="target_type"
             value={String(form.target_type)}
             onChange={handleChange}
-            disabled={isEdit}
-            className="w-full rounded-lg border border-slate-300 bg-white p-2 disabled:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-700"
+            disabled={editing ? true : false}
+            className="w-full rounded-lg border p-2 dark:bg-slate-800"
           >
             <option value="true">Tất cả khách thuê</option>
-
             <option value="false">Chọn người nhận</option>
           </select>
         </div>
 
-        {/* Danh sách hiện ra khi chọn gửi riêng */}
-        {!form.target_type && !isEdit && (
-          <div className="rounded-lg border p-2 dark:border-slate-700">
-            <div className="flex items-center justify-between">
-              <Label>Người nhận</Label>
+        {form.target_type === false && !editing && (
+          <div className="max-h-40 overflow-y-auto border p-2">
+            {users.length === 0 && <p className="text-sm text-gray-500">Không có người nhận.</p>}
 
-              <span className="text-xs text-slate-500 dark:text-slate-400">Đã chọn: {form.user_id.length}</span>
-            </div>
+            {users.map((user) => {
+              return (
+                <label key={user.id} className="flex items-center gap-2 py-1 textx-center">
+                  <input
+                    type="checkbox"
+                    checked={form.user_id.includes(user.id)}
+                    onChange={() => handleUserCheck(user.id)}
+                  />
 
-            <div className="mt-1 max-h-32 overflow-y-auto">
-              {users.length === 0 ? (
-                <p className="py-2 text-sm text-slate-500 dark:text-slate-400">Không có khách thuê.</p>
-              ) : (
-                users.map((user) => (
-                  <label key={user.id} className="flex cursor-pointer items-center gap-2 border-b py-1 last:border-0 dark:border-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={form.user_id.includes(user.id)}
-                      onChange={() => handleUserCheck(user.id)}
-                    />
-
-                    <span className="truncate text-sm">
-                      {getTenantName(user)} - {user.email}
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
+                  <span>
+                    {user.tenants && user.tenants.name ? user.tenants.name : user.email}
+                    {" - "}
+                    {user.email}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         )}
 
-        <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">
-          <Button type="button" className="bg-slate-500 hover:bg-slate-700" onClick={onClose} disabled={isSaving}>
+        <div className="flex justify-end gap-2">
+          <Button className="bg-slate-500 hover:bg-slate-700" type="button" onClick={onClose}>
             Hủy
           </Button>
 
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Đang lưu..." : isEdit ? "Cập nhật" : "Thêm mới"}
+          <Button type="submit" disabled={loading}>
+            {loading ? "Đang lưu..." : editing ? "Cập nhật" : "Thêm mới"}
           </Button>
         </div>
       </form>

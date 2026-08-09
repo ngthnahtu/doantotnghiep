@@ -4,7 +4,7 @@ import ContentLayout from "../../../layouts/ContentLayout";
 import { TableLayout, Tbody, Td, Th, Thead, Tr } from "../../../components/common/TableLayout";
 import { formatDate } from "../../../utils/formatDate";
 import { formatCurrency } from "../../../utils/formatCurrency";
-import { Eye } from "lucide-react";
+import { Eye, Search, X } from "lucide-react";
 import Modal from "../../../components/common/Modal";
 import Button from "../../../components/common/Button";
 import Loading from "../../../components/common/Loading";
@@ -26,14 +26,34 @@ export default function PaymentList() {
   const [confirmStatus, setIsConfirmStatus] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [search, setSearch] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(keyword.trim());
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
   useEffect(() => {
     fetchPayment();
-  }, [page]);
+  }, [page, search, filter]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    setSearch("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
 
   const fetchPayment = async () => {
     try {
       setIsLoading(true);
-      const response = await getPayments(page);
+      const response = await getPayments(page, search, filter);
       setPayments(response.data?.data?.data);
       setTotalPage(response.data?.data?.last_page);
     } catch (error) {
@@ -77,22 +97,76 @@ export default function PaymentList() {
     }
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   return (
     <>
-      {toast && <Toast type={toast.type} title={toast.message} onClose={() => setToast(null)} />}
+      {confirmStatus !== null && isApproved && (
+        <ConfirmDialog
+          title={confirmStatus === 1 ? "Xác nhận phê duyệt" : "Xác nhận từ chối"}
+          message={
+            confirmStatus === 1
+              ? `Bạn có chắc muốn phê duyệt giao dịch ${formatCurrency(isApproved.amount)} của khách hàng ${
+                  isApproved.invoices?.contracts?.tenants?.name ?? "-"
+                } không?`
+              : `Bạn có chắc muốn từ chối giao dịch ${formatCurrency(isApproved.amount)} của khách hàng ${
+                  isApproved.invoices?.contracts?.tenants?.name ?? "-"
+                } không?`
+          }
+          isOpen={true}
+          loading={isProcessing}
+          onCancel={() => setIsConfirmStatus(null)}
+          onConfirm={handleConfirm}
+        />
+      )}
 
-      <ContentLayout title="Quản lý hóa đơn">
+      {toast && <Toast type={toast.type} title={toast.message} onClose={() => setToast(null)} />}
+      <ContentLayout
+        title="Quản lý thanh toán"
+        toolbar={
+          <div
+            className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 h-8
+          dark:border-slate-600 dark:bg-slate-800"
+          >
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chờ duyệt</option>
+            <option value="1">Thành công</option>
+            <option value="2">Từ chối</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
               <Th>Mã giao dịch</Th>
+              <Th>Tên khách thuê</Th>
               <Th>Ngày lập</Th>
               <Th>Ngày duyệt</Th>
-              <Th>Ghi chú</Th>
               <Th>Số tiền</Th>
               <Th>Trạng thái</Th>
               <Th>#</Th>
@@ -100,9 +174,17 @@ export default function PaymentList() {
           </Thead>
 
           <Tbody>
-            {payments.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={7}>Chưa có giao dịch nào.</Td>
+                <td className="text-center" colSpan={7}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : payments.length === 0 ? (
+              <Tr>
+                <td className="text-center text-lg p-4" colSpan={7}>
+                  Chưa có giao dịch nào.
+                </td>
               </Tr>
             ) : (
               payments.map((payment) => {
@@ -110,9 +192,9 @@ export default function PaymentList() {
                 return (
                   <Tr key={payment.id}>
                     <Td>{payment.payment_code}</Td>
+                    <Td>{payment?.invoices?.contracts?.tenants?.name}</Td>
                     <Td>{formatDate(payment.payment_date)}</Td>
                     <Td>{formatDate(payment.approved_at)}</Td>
-                    <Td>{payment.note}</Td>
                     <Td>{formatCurrency(payment.amount)}</Td>
                     <Td>
                       <span className={`inline-block rounded-full px-2 py-1 text-sm font-medium ${status.color}`}>
@@ -215,7 +297,9 @@ export default function PaymentList() {
                   <div className="rounded-xl border p-3 text-center dark:border-slate-700">
                     <p className="text-sm text-slate-500 dark:text-slate-400">Số tiền thanh toán</p>
 
-                    <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(isApproved.amount)}</p>
+                    <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(isApproved.amount)}
+                    </p>
                   </div>
 
                   <div>
@@ -234,12 +318,9 @@ export default function PaymentList() {
                   </div>
                 </div>
 
-                {/* Cột phải: ảnh minh chứng */}
-                <div className="rounded-xl border p-3 dark:border-slate-700">
-                  <p className="mb-2 font-semibold">Ảnh minh chứng</p>
-
+                <div className="rounded-xl border dark:border-slate-700">
                   {isApproved.proof_image ? (
-                    <div className="flex h-80 items-center justify-center rounded-xl bg-slate-100 p-2 dark:bg-slate-800">
+                    <div className="flex h-120 items-center justify-center rounded-xl p-2 dark:bg-slate-800">
                       <img
                         src={getImageUrl(isApproved.proof_image)}
                         alt="Ảnh minh chứng thanh toán"
@@ -247,7 +328,7 @@ export default function PaymentList() {
                       />
                     </div>
                   ) : (
-                    <div className="flex h-80 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    <div className="flex h-80 items-center justify-center rounded-xl text-slate-500 dark:text-slate-400">
                       Không có ảnh minh chứng.
                     </div>
                   )}
@@ -281,24 +362,6 @@ export default function PaymentList() {
             </Modal>
           );
         })()}
-      {confirmStatus !== null && isApproved && (
-        <ConfirmDialog
-          title={confirmStatus === 1 ? "Xác nhận phê duyệt" : "Xác nhận từ chối"}
-          message={
-            confirmStatus === 1
-              ? `Bạn có chắc muốn phê duyệt giao dịch ${formatCurrency(isApproved.amount)} của khách hàng ${
-                  isApproved.invoices?.contracts?.tenants?.name ?? "-"
-                } không?`
-              : `Bạn có chắc muốn từ chối giao dịch ${formatCurrency(isApproved.amount)} của khách hàng ${
-                  isApproved.invoices?.contracts?.tenants?.name ?? "-"
-                } không?`
-          }
-          isOpen={true}
-          loading={isProcessing}
-          onCancel={() => setIsConfirmStatus(null)}
-          onConfirm={handleConfirm}
-        />
-      )}
     </>
   );
 }
@@ -325,7 +388,7 @@ const statusList = (payment) => {
   }
   if (status === 1) {
     return {
-      text: "Đã duyệt",
+      text: "Thành công",
       color: "bg-green-100 text-green-500 dark:bg-green-950 dark:text-green-300",
     };
   }

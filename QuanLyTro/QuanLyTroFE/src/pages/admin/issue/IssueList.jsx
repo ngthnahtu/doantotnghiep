@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Search, Trash2, X } from "lucide-react";
 
 import { deleteIssue, getIssues, updateIssue } from "../../../services/issueService";
 
@@ -43,25 +43,42 @@ export default function IssueList() {
   const [viewing, setViewing] = useState(null);
   const [editing, setEditing] = useState(null);
 
-  const [editForm, setEditForm] = useState({
-    status: 0,
-    note: "",
-  });
+  const [editForm, setEditForm] = useState({status: 0, note: "",});
 
   const [isSaving, setIsSaving] = useState(false);
 
   const [deleting, setDeleting] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch]= useState("");
+  const [filter, setFilter]= useState("");
+
+  useEffect(()=>{
+    const timeout = setTimeout(()=>{
+      setSearch(keyword.trim());
+      setPage(1);
+    },500);
+    return ()=>clearTimeout(timeout);
+  },[keyword]);
+
+  const clearSearch = ()=>{
+    setKeyword("");
+    setSearch("");
+    if(page!==1){
+      setPage(1);
+    }
+  }
+
   useEffect(() => {
     fetchIssues();
-  }, [page]);
+  }, [page,search, filter]);
 
   const fetchIssues = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getIssues(page);
+      const response = await getIssues(page,search, filter);
 
       setIssues(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -168,10 +185,6 @@ export default function IssueList() {
     }
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   return (
     <>
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -189,11 +202,50 @@ export default function IssueList() {
         onConfirm={handleDelete}
       />
 
-      <ContentLayout title="Quản lý sự cố">
+      <ContentLayout
+        title="Quản lý sự cố"
+        toolbar={
+          <div
+            className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 h-8
+          dark:border-slate-600 dark:bg-slate-800"
+          >
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chờ tiếp nhận</option>
+            <option value="1">Đang xử lý</option>
+            <option value="2">Đã xử lý</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
-              <Th>ID</Th>
               <Th>Tiêu đề</Th>
               <Th>Phòng</Th>
               <Th>Khách thuê</Th>
@@ -204,9 +256,15 @@ export default function IssueList() {
           </Thead>
 
           <Tbody>
-            {issues.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={7}>Chưa có sự cố.</Td>
+                <td className="text-center" colSpan={6}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : issues.length === 0 ? (
+              <Tr>
+                <td className="text-center p-4 text-lg" colSpan={6}>Chưa có sự cố</td>
               </Tr>
             ) : (
               issues.map((issue) => {
@@ -214,8 +272,6 @@ export default function IssueList() {
 
                 return (
                   <Tr key={issue.id}>
-                    <Td>{issue.id}</Td>
-
                     <Td>{issue.title}</Td>
 
                     <Td>{issue.rooms?.room_name || issue.room_id}</Td>
@@ -271,75 +327,60 @@ export default function IssueList() {
       <Paginate page={page} totalPage={totalPage} setPage={setPage} />
 
       {viewing && (
-  <Modal
-    title="Chi tiết sự cố"
-    isOpen={viewing !== null}
-    onClose={() => setViewing(null)}
-    className="max-w-4xl"
-  >
-    <div className="flex gap-5">
-      {viewing.proof_image ? (
-        <img
-          src={getImageUrl(viewing.proof_image)}
-          alt="Hình ảnh sự cố"
-          className="h-60 w-60 shrink-0 rounded-xl border object-cover dark:border-slate-700"
-        />
-      ) : (
-        <div className="flex h-60 w-60 shrink-0 items-center justify-center rounded-xl border bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-          Sự cố chưa có hình ảnh
-        </div>
+        <Modal title="Chi tiết sự cố" isOpen={viewing !== null} onClose={() => setViewing(null)} className="max-w-4xl">
+          <div className="flex gap-5">
+            {viewing.proof_image ? (
+              <img
+                src={getImageUrl(viewing.proof_image)}
+                alt="Hình ảnh sự cố"
+                className="h-60 w-60 shrink-0 rounded-xl object-cover dark:border-slate-700"
+              />
+            ) : (
+              <div className="flex h-60 w-60 shrink-0 items-center justify-center rounded-xl border bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                Sự cố chưa có hình ảnh
+              </div>
+            )}
+
+            <div className="grid min-w-0 flex-1 grid-cols-2 gap-4">
+              <div className="min-w-0">
+                <Label>Tiêu đề</Label>
+                <p className="break-words">{viewing.title}</p>
+              </div>
+
+              <div>
+                <Label>Trạng thái</Label>
+                <p>{getStatus(viewing).text}</p>
+              </div>
+
+              <div>
+                <Label>Phòng</Label>
+                <p>{viewing.rooms?.room_name || viewing.room_id}</p>
+              </div>
+
+              <div>
+                <Label>Khách thuê</Label>
+                <p>{viewing.tenants?.name || viewing.tenant_id}</p>
+              </div>
+
+              <div className="col-span-2 min-w-0">
+                <Label>Mô tả</Label>
+                <p className="whitespace-pre-wrap break-words">{viewing.description || "Không có mô tả."}</p>
+              </div>
+
+              <div className="col-span-2 min-w-0">
+                <Label>Ghi chú</Label>
+                <p className="whitespace-pre-wrap break-words">{viewing.note || "Chưa có ghi chú."}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button type="button" className="bg-slate-500 hover:bg-slate-700" onClick={() => setViewing(null)}>
+              Đóng
+            </Button>
+          </div>
+        </Modal>
       )}
-
-      <div className="grid min-w-0 flex-1 grid-cols-2 gap-4">
-        <div className="min-w-0">
-          <Label>Tiêu đề</Label>
-          <p className="break-words">
-            {viewing.title}
-          </p>
-        </div>
-
-        <div>
-          <Label>Trạng thái</Label>
-          <p>{getStatus(viewing).text}</p>
-        </div>
-
-        <div>
-          <Label>Phòng</Label>
-          <p>{viewing.rooms?.room_name || viewing.room_id}</p>
-        </div>
-
-        <div>
-          <Label>Khách thuê</Label>
-          <p>{viewing.tenants?.name || viewing.tenant_id}</p>
-        </div>
-
-        <div className="col-span-2 min-w-0">
-          <Label>Mô tả</Label>
-          <p className="whitespace-pre-wrap break-words">
-            {viewing.description || "Không có mô tả."}
-          </p>
-        </div>
-
-        <div className="col-span-2 min-w-0">
-          <Label>Ghi chú</Label>
-          <p className="whitespace-pre-wrap break-words">
-            {viewing.note || "Chưa có ghi chú."}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div className="flex justify-end">
-      <Button
-        type="button"
-        className="bg-slate-500 hover:bg-slate-700"
-        onClick={() => setViewing(null)}
-      >
-        Đóng
-      </Button>
-    </div>
-  </Modal>
-)}
 
       {editing && (
         <Modal

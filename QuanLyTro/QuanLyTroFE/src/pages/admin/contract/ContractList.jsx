@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  createContract,
-  deleteContract,
-  getContracts,
-  terminateContract,
-  updateContract,
-} from "../../../services/contractService";
+import {createContract, deleteContract, getContracts, terminateContract, updateContract,} from "../../../services/contractService";
 import Loading from "../../../components/common/Loading";
 import ConfirmDialog from "../../../components/common/ConfirmDialog";
 import { formatCurrency } from "../../../utils/formatCurrency";
@@ -15,7 +9,7 @@ import Button from "../../../components/common/Button";
 import { TableLayout, Tbody, Td, Th, Thead, Tr } from "../../../components/common/TableLayout";
 import { formatDate } from "../../../utils/formatDate";
 import Paginate from "../../../components/common/Paginate";
-import { CircleXIcon, Eye, Pencil, Trash2, UserPlus} from "lucide-react";
+import { CircleXIcon, Eye, Pencil, Search, Trash2, UserPlus, X } from "lucide-react";
 import Modal from "../../../components/common/Modal";
 import Label from "../../../components/common/Label";
 import { roomOptions } from "../../../services/roomService";
@@ -47,6 +41,9 @@ export default function ContractList() {
   const [contracts, setContracts] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPage, setTotalPage] = useState(1);
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter,setFilter]=useState("");
 
   const [isModalContractOpen, setIsModalContractOpen] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
@@ -70,13 +67,29 @@ export default function ContractList() {
   const [memberContract, setMemberContract] = useState(null);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      setSearch(keyword.trim());
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    setSearch("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
+
+  useEffect(() => {
     fetchContracts();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchContracts = async () => {
     try {
       setIsLoading(true);
-      const response = await getContracts(page);
+      const response = await getContracts(page, search, filter);
       setContracts(response.data.data.data);
       setTotalPage(response.data.data.last_page);
     } catch (error) {
@@ -141,7 +154,7 @@ export default function ContractList() {
   };
 
   const closeFormModal = () => {
-    if(isSaving) return;
+    if (isSaving) return;
     setContractForm(initFormContract);
     setIsModalContractOpen(false);
     setEditingContract(null);
@@ -197,7 +210,7 @@ export default function ContractList() {
       setContractForm(initFormContract);
 
       await fetchContracts();
-      
+
     } catch (error) {
       setToast({
         type: "error",
@@ -267,13 +280,17 @@ export default function ContractList() {
         actual_end_date: terminateForm.actual_end_date,
         returned_deposit: Number(terminateForm.returned_deposit),
       };
+
       await terminateContract(terminatingContract.id, data);
+
       setToast({
         type: "success",
         message: "Thanh lý hợp đồng thành công.",
       });
+
       closeTerminateConfirm();
       await fetchContracts();
+      
     } catch (error) {
       setToast({
         type: "error",
@@ -330,9 +347,6 @@ export default function ContractList() {
     });
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
   return (
     <>
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -346,14 +360,9 @@ export default function ContractList() {
         loading={isDeleting}
       />
 
-      {memberContract && (
-        <RoomMemBerList contract={memberContract}
-        onClose={()=>setMemberContract(null)}/>
-      )}
+      {memberContract && <RoomMemBerList contract={memberContract} onClose={() => setMemberContract(null)} />}
 
-      {viewingContract && (
-        <ContractView contract={viewingContract} onClose={() => setViewingContract(null)} />
-      )}
+      {viewingContract && <ContractView contract={viewingContract} onClose={() => setViewingContract(null)} />}
 
       {terminatingContract && (
         <Modal
@@ -463,16 +472,52 @@ export default function ContractList() {
         loading={isTerminating}
       />
 
-      
-
-      <ContentLayout title="Quản lý hợp đồng" action={<Button onClick={openCreateModal}>Thêm mới</Button>}>
+      <ContentLayout
+        title="Quản lý hợp đồng"
+        action={<Button onClick={openCreateModal}>Thêm mới</Button>}
+        toolbar={
+          <div className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 dark:border-slate-600 dark:bg-slate-800">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Đang hiệu lực</option>
+            <option value="1">Đã thanh lý</option>
+            <option value="2">Đã hủy</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
               <Th>Mã Hợp Đồng</Th>
+              <Th>Khách thuê</Th>
               <Th>Ngày bắt đầu</Th>
               <Th>Ngày hết hạn</Th>
-              <Th>Tiền cọc</Th>
               <Th>Phòng</Th>
               <Th>Trạng Thái</Th>
               <Th>#</Th>
@@ -480,19 +525,29 @@ export default function ContractList() {
             </Tr>
           </Thead>
           <Tbody>
-            {contracts.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={8}>Chưa có dữ liệu</Td>
+                <td className="text-center" colSpan={8}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : contracts.length === 0 ? (
+              <Tr>
+                <td className="text-lg text-center p-4" colSpan={8}>
+                  Chưa có dữ liệu
+                </td>
               </Tr>
             ) : (
               contracts.map((contract) => {
                 const status = getStatus(contract);
+                const isActiveContract = contract.status == 0;
+                const canCancel = contract.status === 0 && contract.invoices.length == 0;
                 return (
                   <Tr key={contract.id}>
                     <Td>{contract.contract_code}</Td>
+                    <Td>{contract?.tenants?.name}</Td>
                     <Td>{formatDate(contract.start_date)}</Td>
                     <Td>{formatDate(contract.end_date)}</Td>
-                    <Td>{formatCurrency(contract.deposit)}</Td>
                     <Td>{contract.rooms.room_name}</Td>
                     <Td>
                       <span className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${status.color}`}>
@@ -502,10 +557,11 @@ export default function ContractList() {
 
                     <Td>
                       <div className="flex items-center justify-center gap-8">
-
-                        <button className="text-green-500 hover:text-green-700"
-                        title="Người ở cùng"
-                        onClick={()=>setMemberContract(contract)}>
+                        <button
+                          className="text-green-500 hover:text-green-700"
+                          title="Người ở cùng"
+                          onClick={() => setMemberContract(contract)}
+                        >
                           <UserPlus size={20}></UserPlus>
                         </button>
 
@@ -518,17 +574,19 @@ export default function ContractList() {
                         </button>
 
                         <button
-                          className="text-yellow-500 hover:text-yellow-700"
+                          className="text-yellow-500 hover:text-yellow-700 disabled:cursor-not-allowed disabled:opacity-40"
                           onClick={() => openEditModal(contract)}
                           title="Chỉnh sửa"
+                          disabled={!isActiveContract}
                         >
                           <Pencil size={20} />
                         </button>
 
                         <button
-                          className="text-red-500 hover:text-red-700"
+                          className="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                           onClick={() => setDeletingContract(contract)}
                           title="Hủy hợp đồng"
+                          disabled={!canCancel}
                         >
                           <Trash2 size={20} />
                         </button>
@@ -536,7 +594,7 @@ export default function ContractList() {
                     </Td>
                     <Td>
                       <div className="flex items-center justify-center">
-                        {Number(contract.status) === 0 && (
+                        {Number(contract.status) === 0 && contract.invoices.length > 0 && (
                           <button
                             className="text-center text-red-500 hover:text-red-700"
                             title="Thanh lý hợp đồng"
@@ -576,29 +634,29 @@ export default function ContractList() {
   );
 }
 const getStatus = (contract) => {
-    if (Number(contract.status) === 1) {
-      return {
-        text: "Đã thanh lý",
-        color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
-      };
-    }
-    if (Number(contract.status) === 2) {
-      return {
-        text: "Đã hủy",
-        color: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-      };
-    }
-    const today = new Date().toLocaleDateString("en-CA");
-    const endDate = contract.end_date.slice(0, 10);
-
-    if (endDate < today) {
-      return {
-        text: "Quá hạn - Chờ thanh lý",
-        color: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-      };
-    }
+  if (Number(contract.status) === 1) {
     return {
-      text: "Đang hiệu lực",
-      color: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+      text: "Đã thanh lý",
+      color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
     };
+  }
+  if (Number(contract.status) === 2) {
+    return {
+      text: "Đã hủy",
+      color: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    };
+  }
+  const today = new Date().toLocaleDateString("en-CA");
+  const endDate = contract.end_date.slice(0, 10);
+
+  if (endDate < today) {
+    return {
+      text: "Quá hạn - Chờ thanh lý",
+      color: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+    };
+  }
+  return {
+    text: "Đang hiệu lực",
+    color: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
   };
+};

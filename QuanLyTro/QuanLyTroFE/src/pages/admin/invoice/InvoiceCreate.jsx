@@ -21,7 +21,7 @@ export default function InvoiceCreate() {
 
   const [billMonth, setBillMonth] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [invoiceRooms, setInvoiceRooms] = useState([]);
+  const [invoiceRooms, setInvoiceRooms] = useState([]); 
 
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
@@ -29,7 +29,6 @@ export default function InvoiceCreate() {
     const month = event.target.value;
 
     setBillMonth(month);
-
     if (!month) {
       setInvoiceRooms([]);
       return;
@@ -37,13 +36,10 @@ export default function InvoiceCreate() {
 
     try {
       setIsLoading(true);
-
       const response = await prepareInvoice(month);
-
       setInvoiceRooms(response.data.data ?? []);
     } catch (error) {
       setInvoiceRooms([]);
-
       setToast({
         type: "error",
         message: error.response?.data?.message || "Không thể tải danh sách phòng.",
@@ -53,7 +49,7 @@ export default function InvoiceCreate() {
     }
   };
 
-  const [year, month] = billMonth.split("-") ?? [];
+  const [year, month] = billMonth.split("-");
 
   const handleNewIndexChange = (roomIndex, serviceIndex, value) => {
     const newRooms = [...invoiceRooms];
@@ -64,25 +60,15 @@ export default function InvoiceCreate() {
   const handleSaveInvoice = async () => {
     setIsConfirmDialogOpen(false);
     if (!billMonth) {
-      setToast({
-        type: "error",
-        message: "Vui lòng chọn tháng hóa đơn.",
-      });
-      return;
+      setToast({ type: "error", message: "Vui lòng chọn tháng hóa đơn.", }); return;
     }
+
     if (!dueDate) {
-      setToast({
-        type: "error",
-        message: "Vui lòng chọn hạn thanh toán.",
-      });
-      return;
+      setToast({ type: "error", message: "Vui lòng chọn hạn thanh toán.",}); return;
     }
+
     if (invoiceRooms.length === 0) {
-      setToast({
-        type: "error",
-        message: "Không có phòng để lập hóa đơn.",
-      });
-      return;
+      setToast({ type: "error", message: "Không có phòng để lập hóa đơn.", }); return;
     }
 
     const newData = {
@@ -101,20 +87,23 @@ export default function InvoiceCreate() {
     try {
       setIsLoading(true);
       await createInvoice(newData);
-      navigate("/admin/invoice");
+
+      setToast({
+        type: "success",
+        message: "Phát hành hóa đơn hàng loạt thành công.",
+      });
+
+      setTimeout(() => {
+        navigate("/admin/invoice");
+      }, 300);
     } catch (error) {
       setToast({
         type: "error",
         message: error.response?.data?.error || error.response?.data?.message || "Không thể lập hóa đơn.",
       });
-    } finally {
       setIsLoading(false);
     }
   };
-
-  if (isLoading) {
-    return <Loading />;
-  }
 
   return (
     <>
@@ -144,115 +133,105 @@ export default function InvoiceCreate() {
             />
           </div>
 
-          <TableLayout>
-            <Thead>
-              <Tr>
-                <Th>Phòng</Th>
-                <Th>Số người</Th>
-                <Th>Dịch vụ</Th>
-                <Th>Tiền phòng</Th>
-                <Th>Tạm tính</Th>
-              </Tr>
-            </Thead>
-
-            <Tbody>
-              {invoiceRooms.length === 0 ? (
+          <div className="max-h-[400px] overflow-y-auto">
+            <TableLayout>
+              <Thead>
                 <Tr>
-                  <Td colSpan={5}>{billMonth ? "Không có phòng cần lập hóa đơn." : "Vui lòng chọn tháng."}</Td>
+                  <Th>Phòng</Th>
+                  <Th>Số người</Th>
+                  <Th>Dịch vụ</Th>
+                  <Th>Tiền phòng</Th>
+                  <Th>Tạm tính</Th>
                 </Tr>
-              ) : (
-                invoiceRooms.map((room, roomIndex) => (
-                  <Tr key={room.contract_id}>
-                    <Td>{room.room_name}</Td>
+              </Thead>
 
-                    <Td>{room.member_count} người</Td>
-
-                    <Td>
-                      <div className="mx-auto grid w-[270px] gap-2">
-                        {room.services.map((service, serviceIndex) => (
-                          <div key={service.service_id} className="grid grid-cols-[70px_1fr] items-center gap-2">
-                            <span className="text-left font-medium">{service.service_name}</span>
-
-                            {Number(service.charge_type) === 0 && (
-                              <span className="text-left">{formatCurrency(service.unit_price)}</span>
-                            )}
-
-                            {Number(service.charge_type) === 2 && (
-                              <span className="text-left">
-                                {formatCurrency(service.unit_price)}
-                                {" x "}
-                                {room.member_count}
-                              </span>
-                            )}
-
-                            {Number(service.charge_type) === 1 && (
-                              <div className="grid grid-cols-[64px_20px_64px] items-center gap-1">
-                                <input
-                                  type="number"
-                                  value={service.old_index ?? ""}
-                                  readOnly
-                                  className="h-8 w-16 rounded-lg border bg-gray-100 text-center dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                />
-
-                                <MoveRight size={18} />
-
-                                <input
-                                  type="number"
-                                  value={service.new_index ?? ""}
-                                  placeholder="Mới"
-                                  onChange={(event) =>
-                                    handleNewIndexChange(roomIndex, serviceIndex, event.target.value)
-                                  }
-                                  className="h-8 w-16 rounded-lg border text-center dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </Td>
-
-                    <Td>{formatCurrency(room.room_price)}</Td>
-
-                    <Td className="font-semibold text-blue-600 dark:text-blue-400">
-                      {formatCurrency(
-                        Number(room.room_price) +
-                          room.services.reduce((total, service) => {
-                            const type = Number(service.charge_type);
-                            const price = Number(service.unit_price);
-
-                            if (type === 0) {
-                              return total + price;
-                            }
-
-                            if (type === 2) {
-                              return total + price * Number(room.member_count);
-                            }
-
-                            if (
-                              type === 1 &&
-                              service.new_index !== "" &&
-                              service.new_index != null &&
-                              Number(service.new_index) >= Number(service.old_index)
-                            ) {
-                              return total + (Number(service.new_index) - Number(service.old_index)) * price;
-                            }
-                            return total;
-                          }, 0),
-                      )}
-                    </Td>
+              <Tbody>
+                {isLoading ? (
+                  <Tr>
+                    <td className="text-center" colSpan={5}>
+                      <Loading />
+                    </td>
                   </Tr>
-                ))
-              )}
-            </Tbody>
-          </TableLayout>
+                ) : invoiceRooms.length === 0 ? (
+                  <Tr>
+                    <td className="text-center p-3 text-lg" colSpan={5}>
+                      {billMonth ? "Không có phòng cần lập hóa đơn." : "Vui lòng chọn tháng."}
+                    </td>
+                  </Tr>
+                ) : (
+                  invoiceRooms.map((room, roomIndex) => (
+                    <Tr key={room.contract_id}>
+                      <Td>{room.room_name}</Td>
+                      <Td>{room.member_count} người</Td>
+
+                      <Td>
+                        <div className="mx-auto w-fit space-y-2">
+                          {room.services.map((service, serviceIndex) => (
+                            <div key={service.service_id} className="flex items-center gap-2">
+                              <span className="w-16 text-left font-medium">{service.service_name}</span>
+
+                              {Number(service.charge_type) === 0 && <span>{formatCurrency(service.unit_price)}</span>}
+
+                              {Number(service.charge_type) === 2 && (
+                                <span> {formatCurrency(service.unit_price)} x {room.member_count} </span>
+                              )}
+
+                              {Number(service.charge_type) === 1 && (
+                                <div className="flex items-center gap-2">
+                                  <input type="number" value={service.old_index ?? ""} readOnly
+                                    className="h-8 w-16 rounded-lg border bg-gray-100 text-center"/>
+
+                                  <MoveRight size={18} />
+
+                                  <input type="number" value={service.new_index ?? ""} placeholder="Mới"
+                                    onChange={(event) =>
+                                      handleNewIndexChange(roomIndex, serviceIndex, event.target.value)
+                                    }
+                                    className="h-8 w-16 rounded-lg border text-center"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </Td>
+
+                      <Td>{formatCurrency(room.room_price)}</Td>
+
+                      <Td className="font-semibold text-blue-600 dark:text-blue-400">
+                          {formatCurrency(
+                          Number(room.room_price) +
+                            room.services.reduce((total, service) => {
+                              const type = Number(service.charge_type);
+                              const price = Number(service.unit_price);
+
+                              if (type === 0) {
+                                return total + price;
+                              }
+
+                              if (type === 2) {
+                                return total + price * Number(room.member_count);
+                              }
+
+                              if (type === 1 && service.new_index !== "" && service.new_index != null &&
+                                Number(service.new_index) >= Number(service.old_index)
+                              ) {
+                                return total + ((Number(service.new_index) - Number(service.old_index)) * price);
+                              }
+                              return total;
+                            }, 0),
+                        )}
+                      </Td>
+                    </Tr>
+                  ))
+                )}
+              </Tbody>
+            </TableLayout>
+          </div>
 
           <div className="flex items-end justify-between bg-white py-2 dark:bg-slate-900">
-            <Button
-              type="button"
-              className="h-9 bg-gray-500 hover:bg-gray-600"
-              onClick={() => navigate("/admin/invoice")}
-            >
+            <Button type="button" className="h-9 bg-gray-500 hover:bg-gray-600"
+              onClick={() => navigate("/admin/invoice")}>
               Quay lại
             </Button>
 
@@ -261,10 +240,7 @@ export default function InvoiceCreate() {
                 <div>
                   <Label htmlFor="due_date">Hạn thanh toán</Label>
 
-                  <input
-                    id="due_date"
-                    type="date"
-                    value={dueDate}
+                  <input id="due_date" type="date" value={dueDate}
                     onChange={(event) => setDueDate(event.target.value)}
                     className="h-9 rounded-lg border px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />

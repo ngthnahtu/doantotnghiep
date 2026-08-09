@@ -24,6 +24,7 @@ const invoiceStatus = [
   "Chờ duyệt",
   "Thanh toán một phần",
   "Hoàn thành",
+  "Quá hạn"
 ];
 
 export default function Dashboard() {

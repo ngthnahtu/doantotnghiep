@@ -46,7 +46,7 @@ export default function Login() {
         if (user.role === 1) {
           navigate("/tenant/contract");
         }
-      }, 500);
+      }, 300);
       setToast({
         type: "success",
         message: response.data.message,

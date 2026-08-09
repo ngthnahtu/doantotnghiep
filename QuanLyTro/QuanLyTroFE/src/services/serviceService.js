@@ -1,7 +1,11 @@
 import api from "./api"
 
-export const getServices = (page=1)=>{
-    return api.get(`/services?page=${page}`);
+export const getServices = (page=1, search="", filter="")=>{
+    return api.get("/services",{
+        params:{
+            page,search, filter
+        }
+    });
 }
 export const  getService = (id)=>{
     return api.get(`/services/${id}`);

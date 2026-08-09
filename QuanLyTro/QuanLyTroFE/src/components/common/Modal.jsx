@@ -6,7 +6,7 @@ function Modal({ title, isOpen, onClose, children, className = "max-w-lg" }) {
   }
 
   return (
-    <div className="fixed top-0 left-0 w-full h-screen flex items-center justify-center bg-black/30">
+    <div className="fixed top-0 left-0 z-50 w-full h-screen flex items-center justify-center bg-black/30">
       <div
         className={`w-full rounded-xl bg-white shadow p-6 transition-all duration-200 dark:bg-slate-900 dark:text-slate-100 ${className}`}
       >

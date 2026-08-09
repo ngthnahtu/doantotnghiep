@@ -1,11 +1,25 @@
 import api from "./api";
 
-export const getNotifications = (page = 1) => {
-  return api.get(`/notifications?page=${page}&view=manage`);
+export const getNotifications = (page = 1, search="", filter="") => {
+  return api.get("/notifications",{
+    params:{
+      page,
+      view:"manage",
+      search,
+      filter
+    }
+  });
 };
 
-export const getNotificationsBell = (page = 1) => {
-  return api.get(`/notifications?page=${page}&view=bell`);
+export const getNotificationsBell = (page = 1, search="", filter="") => {
+  return api.get("/notifications",{
+    params:{
+      page,
+      view:"bell",
+      search,
+      filter
+    }
+  })
 };
 
 export const getNotification = (id) => {

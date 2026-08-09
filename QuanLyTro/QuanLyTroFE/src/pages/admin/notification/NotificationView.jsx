@@ -3,7 +3,7 @@ import Label from "../../../components/common/Label";
 import Modal from "../../../components/common/Modal";
 import { formatDate } from "../../../utils/formatDate";
 
-const typeList = ["Chung", "Hợp đồng", "Hóa đơn", "Thanh toán"];
+const typeList = ["Chung", "Hợp đồng", "Hóa đơn", "Thanh toán","Sự cố"];
 
 export default function NotificationView({ notification, onClose }) {
   if (!notification) {

@@ -1,7 +1,11 @@
 import api from "./api";
 
-export const getTenants = (page = 1) => {
-    return api.get(`/tenants?page=${page}`);
+export const getTenants = (page = 1,search="", filter="") => {
+    return api.get("/tenants",{
+        params:{
+            page, search, filter
+        }
+    });
 };
 
 export const getTenant = (id) => {

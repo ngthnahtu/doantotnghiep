@@ -6,6 +6,3 @@ export const login = (data)=>{
 export const logout = ()=>{
     return api.post("/logout");
 }
-export const getUser = ()=>{
-    return api.get("/user");
-}

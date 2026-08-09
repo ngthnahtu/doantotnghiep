@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Search, X } from "lucide-react";
 
 import { createIssue, getIssues } from "../../../services/issueService";
 
@@ -52,15 +52,35 @@ export default function IssueTenant() {
   const [form, setForm] = useState(initialForm);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter]= useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(keyword.trim());
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    setSearch("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
+
   useEffect(() => {
     fetchIssues();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchIssues = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getIssues(page);
+      const response = await getIssues(page, keyword, filter);
 
       setIssues(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -97,7 +117,6 @@ export default function IssueTenant() {
       setIsSaving(true);
 
       const data = new FormData();
-
       data.append("title", form.title);
       data.append("description", form.description);
 
@@ -151,19 +170,55 @@ export default function IssueTenant() {
     return `${BACKEND_URL}/storage/${cleanPath}`;
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   return (
     <>
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <ContentLayout title="Sự cố của tôi" action={<Button onClick={() => setIsFormOpen(true)}>Báo sự cố</Button>}>
+      <ContentLayout
+        title="Sự cố của tôi"
+        action={<Button onClick={() => setIsFormOpen(true)}>Báo sự cố</Button>}
+        toolbar={
+          <div
+            className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 h-8
+          dark:border-slate-600 dark:bg-slate-800"
+          >
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chờ tiếp nhận</option>
+            <option value="1">Đang xử lý</option>
+            <option value="2">Đã xử lý</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
-              <Th>ID</Th>
               <Th>Tiêu đề</Th>
               <Th>Ngày gửi</Th>
               <Th>Trạng thái</Th>
@@ -172,9 +227,17 @@ export default function IssueTenant() {
           </Thead>
 
           <Tbody>
-            {issues.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={5}>Bạn chưa báo cáo sự cố nào.</Td>
+                <td className="text-center" colSpan={5}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : issues.length === 0 ? (
+              <Tr>
+                <td className="text-center text-lg p-3" colSpan={5}>
+                  Bạn chưa báo cáo sự cố nào.
+                </td>
               </Tr>
             ) : (
               issues.map((issue) => {
@@ -182,8 +245,6 @@ export default function IssueTenant() {
 
                 return (
                   <Tr key={issue.id}>
-                    <Td>{issue.id}</Td>
-
                     <Td>{issue.title}</Td>
 
                     <Td>{formatDate(issue.created_at)}</Td>
@@ -273,7 +334,7 @@ export default function IssueTenant() {
 
       {viewing && (
         <Modal title="Chi tiết sự cố" isOpen={viewing !== null} onClose={() => setViewing(null)} className="max-w-xl">
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Tiêu đề</Label>
               <p>{viewing.title}</p>
@@ -286,29 +347,27 @@ export default function IssueTenant() {
 
             <div>
               <Label>Trạng thái</Label>
-
               <p>{getStatus(viewing).text}</p>
             </div>
 
             <div>
               <Label>Ghi chú của quản trị viên</Label>
-
               <p>{viewing.note || "Chưa có ghi chú."}</p>
             </div>
 
             {viewing.proof_image && (
-              <div>
+              <div className="col-span-2">
                 <Label>Hình ảnh</Label>
 
                 <img
                   src={getImageUrl(viewing.proof_image)}
                   alt="Hình ảnh sự cố"
-                  className="mt-1 max-h-64 rounded-xl border object-contain dark:border-slate-700"
+                  className="mt-1 max-h-64 rounded-xl object-contain dark:border-slate-700"
                 />
               </div>
             )}
 
-            <div className="flex justify-end">
+            <div className="col-span-2 flex justify-end border-t pt-4 dark:border-slate-700">
               <Button type="button" className="bg-slate-500 hover:bg-slate-700" onClick={() => setViewing(null)}>
                 Đóng
               </Button>

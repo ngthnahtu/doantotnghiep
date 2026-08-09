@@ -4,9 +4,7 @@ import { X, CircleCheck, CircleX } from "lucide-react";
 export default function Toast({ title, type, onClose }) {
   useEffect(() => {
     if (!title) return;
-
     const timer = setTimeout(onClose, 4000);
-
     return () => clearTimeout(timer);
   }, [title]);
 
@@ -15,7 +13,7 @@ export default function Toast({ title, type, onClose }) {
   const isError = type === "error";
 
   return (
-    <div className="fixed top-5 left-1/2 z-50 -translate-x-1/2">
+    <div className="fixed top-5 left-1/2 z-70 -translate-x-1/2">
       <div
         className={`flex w-[350px] items-center gap-3 rounded-xl border p-3 text-sm shadow-lg ${
           isError
@@ -23,11 +21,7 @@ export default function Toast({ title, type, onClose }) {
             : "border-green-300 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300"
         }`}
       >
-        {isError ? (
-          <CircleX size={21} className="shrink-0" />
-        ) : (
-          <CircleCheck size={21} className="shrink-0" />
-        )}
+        {isError ? <CircleX size={21} className="shrink-0" /> : <CircleCheck size={21} className="shrink-0" />}
 
         <p className="flex-1">{title}</p>
 

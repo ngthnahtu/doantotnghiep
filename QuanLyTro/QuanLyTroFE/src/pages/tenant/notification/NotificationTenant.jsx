@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Search, X } from "lucide-react";
 
 import { getNotificationsBell } from "../../../services/notificationService";
 import { updateNotificationUser } from "../../../services/notificationUserService";
@@ -14,7 +14,7 @@ import { formatDate } from "../../../utils/formatDate";
 
 import NotificationView from "../../admin/notification/NotificationView";
 
-const typeList = ["Chung", "Hợp đồng", "Hóa đơn", "Thanh toán"];
+const typeList = ["Chung", "Hợp đồng", "Hóa đơn", "Thanh toán", "Sự cố"];
 
 export default function NotificationTenant() {
   const [notifications, setNotifications] = useState([]);
@@ -25,15 +25,35 @@ export default function NotificationTenant() {
   const [toast, setToast] = useState(null);
   const [viewing, setViewing] = useState(null);
 
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter]= useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(keyword.trim());
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    setSearch("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getNotificationsBell(page);
+      const response = await getNotificationsBell(page, search, filter);
 
       setNotifications(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -48,7 +68,8 @@ export default function NotificationTenant() {
   };
 
   const checkIsRead = (notification) => {
-    return Number(notification.notification_users?.[0]?.is_read) === 1;
+    //vi hasmany nen notification_users la mang, du no chi tra ve 1 ptu
+    return Number(notification?.notification_users?.[0]?.is_read) === 1;
   };
 
   const handleView = async (notification) => {
@@ -58,42 +79,67 @@ export default function NotificationTenant() {
     }
 
     try {
+
       await updateNotificationUser(notification.id);
+      await fetchNotifications();
+      setViewing(notification);
 
-      const updatedNotification = {
-        ...notification,
-        notification_users: [
-          {
-            notification_id: notification.id,
-            is_read: true,
-          },
-        ],
-      };
-
-      setNotifications((previous) =>
-        previous.map((item) => (item.id === notification.id ? updatedNotification : item)),
-      );
-
-      setViewing(updatedNotification);
     } catch (error) {
       setToast({
         type: "error",
         message: error.response?.data?.message || "Không thể đánh dấu đã đọc.",
       });
-
       setViewing(notification);
     }
   };
-
-  if (isLoading && notifications.length === 0) {
-    return <Loading />;
-  }
 
   return (
     <>
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <ContentLayout title="Thông báo của tôi">
+      <ContentLayout
+        title="Thông báo của tôi"
+        toolbar={
+          <div
+            className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 h-8
+          dark:border-slate-600 dark:bg-slate-800"
+          >
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chung</option>
+            <option value="1">Hợp đồng</option>
+            <option value="2">Hóa đơn</option>
+            <option value="3">Thanh toán</option>
+            <option value="4">Sự cố</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
@@ -106,11 +152,17 @@ export default function NotificationTenant() {
           </Thead>
 
           <Tbody>
-            {notifications.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={5} className="text-center">
+                <td className="text-center" colSpan={5}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : notifications.length === 0 ? (
+              <Tr>
+                <td colSpan={5} className="text-center text-lg p-3">
                   Bạn chưa có thông báo.
-                </Td>
+                </td>
               </Tr>
             ) : (
               notifications.map((notification) => {
@@ -119,18 +171,9 @@ export default function NotificationTenant() {
                 return (
                   <Tr key={notification.id}>
                     <Td>
-                      <div className="flex items-center gap-2">
-                        {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500"></span>}
-
-                        <div className="min-w-0">
-                          <p className={isRead ? "truncate font-normal" : "truncate font-semibold"}>
-                            {notification.title}
-                          </p>
-
-                          <p className="max-w-md truncate text-xs text-slate-500 dark:text-slate-400">
-                            {notification.content || "Không có nội dung"}
-                          </p>
-                        </div>
+                      <div className="flex items-center gap-2 pl-4">
+                        {!isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500"></span>}
+                        <p className={isRead ? "truncate font-normal" : "truncate font-bold"}>{notification.title}</p>
                       </div>
                     </Td>
 
@@ -141,7 +184,9 @@ export default function NotificationTenant() {
                     <Td>
                       <span
                         className={`inline-block rounded-full px-3 py-1 text-sm ${
-                          isRead ? "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300" : "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"
+                          isRead
+                            ? "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300"
+                            : "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"
                         }`}
                       >
                         {isRead ? "Đã đọc" : "Chưa đọc"}
@@ -166,7 +211,6 @@ export default function NotificationTenant() {
         </TableLayout>
       </ContentLayout>
 
-      {/* Nằm ngoài ContentLayout để được đẩy xuống cuối */}
       <Paginate page={page} totalPage={totalPage} setPage={setPage} />
 
       {viewing && <NotificationView notification={viewing} onClose={() => setViewing(null)} />}

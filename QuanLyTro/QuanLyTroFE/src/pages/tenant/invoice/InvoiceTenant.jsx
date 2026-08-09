@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Search, X } from "lucide-react";
 
 import { getInvoices } from "../../../services/invoiceService";
 import { createPayment } from "../../../services/paymentService";
@@ -17,6 +17,7 @@ import { formatCurrency } from "../../../utils/formatCurrency";
 import { formatDate } from "../../../utils/formatDate";
 
 import InvoiceView from "../../admin/invoice/InvoiceView";
+import { getSettings } from "../../../services/settingService";
 
 const initialPaymentForm = {
   amount: "",
@@ -25,22 +26,11 @@ const initialPaymentForm = {
 };
 
 const statusList = [
-  {
-    text: "Chờ thanh toán",
-    color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300",
-  },
-  {
-    text: "Chờ duyệt",
-    color: "bg-yellow-100 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-300",
-  },
-  {
-    text: "Thanh toán một phần",
-    color: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300",
-  },
-  {
-    text: "Hoàn thành",
-    color: "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-300",
-  },
+  { text: "Chờ thanh toán", color: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300" },
+  { text: "Chờ duyệt", color: "bg-yellow-100 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-300" },
+  { text: "Thanh toán một phần", color: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300" },
+  { text: "Hoàn thành", color: "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-300" },
+  { text: "Quá hạn", color: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300" },
 ];
 
 export default function InvoiceTenant() {
@@ -53,20 +43,58 @@ export default function InvoiceTenant() {
 
   const [viewing, setViewing] = useState(null);
 
-  // Hóa đơn đang được thanh toán.
   const [paying, setPaying] = useState(null);
   const [paymentForm, setPaymentForm] = useState(initialPaymentForm);
   const [isPaying, setIsPaying] = useState(false);
 
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter,setFilter]=useState("");
+
+  const [homeInfor, setHomeInfor] = useState(null);
+
+  useEffect(()=>{
+    fetchHouseInfor();
+  },[]);
+  
+  const fetchHouseInfor = async()=>{
+    try{
+      const response = await getSettings();
+      setHomeInfor(response.data.data.system);
+    }
+    catch(error){
+      setToast({
+        type:"error",
+        message: error?.response?.data?.message ?? "Có lỗi xảy ra."
+      });
+    }
+  }
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(keyword.trim());
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    setSearch("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
+
   useEffect(() => {
     fetchInvoices();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchInvoices = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getInvoices(page);
+      const response = await getInvoices(page, search, filter);
 
       setInvoices(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -91,8 +119,6 @@ export default function InvoiceTenant() {
 
   const openPayment = (invoice) => {
     setPaying(invoice);
-
-    // Mặc định điền toàn bộ số tiền còn nợ.
     setPaymentForm({
       amount: invoice.remain_amount ?? "",
       proof_image: null,
@@ -112,8 +138,6 @@ export default function InvoiceTenant() {
 
     setPaymentForm((previous) => ({
       ...previous,
-
-      // Input file lấy files[0], input thường lấy value.
       [name]: name === "proof_image" ? (files[0] ?? null) : value,
     }));
   };
@@ -129,7 +153,6 @@ export default function InvoiceTenant() {
         type: "error",
         message: "Vui lòng nhập số tiền hợp lệ.",
       });
-
       return;
     }
 
@@ -138,7 +161,6 @@ export default function InvoiceTenant() {
         type: "error",
         message: "Số tiền vượt quá số tiền còn phải trả.",
       });
-
       return;
     }
 
@@ -147,7 +169,6 @@ export default function InvoiceTenant() {
         type: "error",
         message: "Vui lòng chọn ảnh minh chứng.",
       });
-
       return;
     }
 
@@ -156,14 +177,9 @@ export default function InvoiceTenant() {
         type: "error",
         message: "Ảnh minh chứng không được vượt quá 5MB.",
       });
-
       return;
     }
 
-    /*
-     * Có file ảnh nên phải dùng FormData
-     * thay vì gửi object JSON thông thường.
-     */
     const data = new FormData();
 
     data.append("invoice_id", paying.id);
@@ -199,16 +215,50 @@ export default function InvoiceTenant() {
     }
   };
 
-  // Chỉ hiện Loading toàn trang trong lần tải đầu tiên.
-  if (isLoading && invoices.length === 0) {
-    return <Loading />;
-  }
-
   return (
     <>
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <ContentLayout title="Hóa đơn của tôi">
+      <ContentLayout
+        title="Hóa đơn của tôi"
+        toolbar={
+          <div
+            className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 h-8
+            dark:border-slate-600 dark:bg-slate-800">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select name="filter" id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chưa thanh toán</option>
+            <option value="1">Chờ duyệt</option>
+            <option value="2">Một phần</option>
+            <option value="3">Hoàn thành</option>
+            <option value="4">Quá hạn</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
@@ -226,11 +276,17 @@ export default function InvoiceTenant() {
           </Thead>
 
           <Tbody>
-            {invoices.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={10} className="text-center">
-                  Bạn chưa có hóa đơn.
-                </Td>
+                <td className="text-center" colSpan={10}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : invoices.length === 0 ? (
+              <Tr>
+                <td colSpan={10} className="text-center p-4 text-lg">
+                  Chưa có hóa đơn
+                </td>
               </Tr>
             ) : (
               invoices.map((invoice) => {
@@ -270,17 +326,20 @@ export default function InvoiceTenant() {
                     </Td>
 
                     <Td>
-                      <Button
-                        type="button"
-                        onClick={() => openPayment(invoice)}
-                        disabled={Number(invoice.status) === 1 || Number(invoice.status) === 3}
-                      >
-                        {Number(invoice.status) === 1
-                          ? "Chờ duyệt"
-                          : Number(invoice.status) === 3
-                            ? "Đã xong"
-                            : "Thanh toán"}
-                      </Button>
+                      {invoice.status !== 3 && (
+                        <Button
+                          type="button"
+                          onClick={() => openPayment(invoice)}
+                          disabled={Number(invoice.status) === 1 || Number(invoice.status) === 3}
+                          className="font-semibold disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+                        >
+                          {Number(invoice.status) === 1
+                            ? "Chờ duyệt"
+                            : Number(invoice.status) === 3
+                              ? "Đã xong"
+                              : "Thanh toán"}
+                        </Button>
+                      )}
                     </Td>
                   </Tr>
                 );
@@ -291,25 +350,40 @@ export default function InvoiceTenant() {
       </ContentLayout>
       <Paginate page={page} totalPage={totalPage} setPage={setPage} />
 
-      {/* Modal xem chi tiết hóa đơn */}
       {viewing && <InvoiceView invoice={viewing} isOpen={viewing !== null} onClose={() => setViewing(null)} />}
 
-      {/* Modal gửi thông tin chuyển khoản */}
       {paying && (
         <Modal title="Thanh toán hóa đơn" isOpen={paying !== null} onClose={closePayment} className="max-w-xl">
           <form onSubmit={handlePayment} className="flex flex-col gap-4">
-            <div className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800">
-              <p>
-                Mã hóa đơn: <span className="font-semibold">{paying.invoice_code}</span>
-              </p>
+            <div className="flex rounded-xl bg-slate-100 p-3 dark:bg-slate-800 gap-5">
+              <div>
+                <p>
+                  Mã hóa đơn: <span className="font-semibold">{paying.invoice_code}</span>
+                </p>
 
-              <p>
-                Phòng: <span className="font-semibold">{paying.rooms?.room_name || "Không xác định"}</span>
-              </p>
+                <p>
+                  Phòng: <span className="font-semibold">{paying.rooms?.room_name || "Không xác định"}</span>
+                </p>
 
-              <p>
-                Còn phải trả: <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(paying.remain_amount)}</span>
-              </p>
+                <p>
+                  Còn phải trả:{" "}
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    {formatCurrency(paying.remain_amount)}
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <p>
+                  Số Tài Khoản: <span className="font-semibold">{homeInfor?.bank_number ?? "Chưa cập nhật"}</span>
+                </p>
+                <p>
+                  Ngân hàng: <span className="font-semibold">{homeInfor?.bank_name ?? "Chưa cập nhật"}</span>
+                </p>
+                <p>
+                  Chủ tài khoản: <span className="font-semibold">{homeInfor?.bank_owner ?? "Chưa cập nhật"}</span>
+                </p>
+              </div>
             </div>
 
             <div>

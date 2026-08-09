@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Search, X } from "lucide-react";
 
 import { getContracts } from "../../../services/contractService";
 
@@ -37,16 +37,35 @@ export default function ContractTenant() {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(keyword.trim());
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    setSearch("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
 
   useEffect(() => {
     fetchContracts();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchContracts = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getContracts(page);
+      const response = await getContracts(page, search, filter);
 
       setContracts(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -81,15 +100,51 @@ export default function ContractTenant() {
     return status;
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   return (
     <>
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <ContentLayout title="Hợp đồng của tôi">
+      <ContentLayout
+        title="Hợp đồng của tôi"
+        toolbar={
+          <div
+            className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 h-8
+          dark:border-slate-600 dark:bg-slate-800"
+          >
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Đang hiệu lực</option>
+            <option value="1">Đã thanh lý</option>
+            <option value="2">Đã hủy</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
@@ -105,9 +160,17 @@ export default function ContractTenant() {
           </Thead>
 
           <Tbody>
-            {contracts.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={8}>Bạn chưa có hợp đồng.</Td>
+                <td className="text-center" colSpan={8}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : contracts.length === 0 ? (
+              <Tr>
+                <td className="text-center p-3 text-lg" colSpan={8}>
+                  Bạn chưa có hợp đồng.
+                </td>
               </Tr>
             ) : (
               contracts.map((contract) => {

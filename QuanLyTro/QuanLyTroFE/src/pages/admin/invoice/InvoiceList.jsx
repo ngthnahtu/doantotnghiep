@@ -1,30 +1,21 @@
 import { useState, useEffect } from "react";
-import {
-  deleteInvoice,
-  getInvoices,
-} from "../../../services/invoiceService";
+import { deleteInvoice, getInvoices } from "../../../services/invoiceService";
 import Toast from "../../../components/common/Toast";
 import Loading from "../../../components/common/Loading";
 import ContentLayout from "../../../layouts/ContentLayout";
 import Button from "../../../components/common/Button";
 import { useNavigate } from "react-router-dom";
-import {
-  TableLayout,
-  Tbody,
-  Td,
-  Th,
-  Thead,
-  Tr,
-} from "../../../components/common/TableLayout";
+import { TableLayout, Tbody, Td, Th, Thead, Tr } from "../../../components/common/TableLayout";
 import { formatDate } from "../../../utils/formatDate";
 import { formatCurrency } from "../../../utils/formatCurrency";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Search, Trash2, X } from "lucide-react";
 import InvoiceView from "./InvoiceView";
 import Paginate from "../../../components/common/Paginate";
 import InvoiceEdit from "./InvoiceEdit";
 import Modal from "../../../components/common/Modal";
 import ConfirmDialog from "../../../components/common/ConfirmDialog";
 import { createPayment } from "../../../services/paymentService";
+import Input from "../../../components/common/Input";
 
 const initForm = {
   invoice_id: "",
@@ -52,24 +43,43 @@ export default function InvoiceList() {
   const [isPayment, setIsPayment] = useState(null);
   const [formPayment, setFormPayment] = useState(initForm);
 
+  const [search, setSearch] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [filter,setFilter]=useState("");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(keyword.trim());
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
   useEffect(() => {
     fetchInvoices();
-  }, [page]);
+  }, [page, search, filter]);
+
+  const clearSearch = () => {
+    setKeyword("");
+    if (page !== 1) {
+      setPage(1);
+    }
+    setSearch("");
+  };
 
   const fetchInvoices = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getInvoices(page);
-      const invoiceData = response.data.data;
+      const response = await getInvoices(page, search, filter);
 
-      setInvoices(invoiceData.data);
-      setTotalPage(invoiceData.last_page);
+      setInvoices(response.data.data.data);
+      setTotalPage(response.data.data.last_page);
+
     } catch (error) {
       setToast({
         type: "error",
-        message:
-          error.response?.data?.message || "Không thể tải danh sách hóa đơn.",
+        message: error.response?.data?.message || "Không thể tải danh sách hóa đơn.",
       });
     } finally {
       setIsLoading(false);
@@ -99,8 +109,7 @@ export default function InvoiceList() {
     } catch (error) {
       setToast({
         type: "error",
-        message:
-          error.response?.data?.message || "Không thể xóa hóa đơn.",
+        message: error.response?.data?.message || "Không thể xóa hóa đơn.",
       });
     } finally {
       setIsDeleting(false);
@@ -121,18 +130,12 @@ export default function InvoiceList() {
     const remainAmount = Number(isPayment.remain_amount);
 
     if (!amount || amount <= 0) {
-      setToast({
-        type: "error",
-        message: "Vui lòng nhập số tiền thanh toán hợp lệ.",
-      });
+      setToast({ type: "error", message: "Vui lòng nhập số tiền thanh toán hợp lệ.",});
       return;
     }
 
     if (amount > remainAmount) {
-      setToast({
-        type: "error",
-        message: "Số tiền thanh toán lớn hơn số tiền còn lại.",
-      });
+      setToast({type: "error", message: "Số tiền thanh toán lớn hơn số tiền còn lại.",});
       return;
     }
 
@@ -148,44 +151,24 @@ export default function InvoiceList() {
 
       setIsPayment(null);
       setFormPayment(initForm);
-
       await fetchInvoices();
 
       setToast({
         type: "success",
-        message:
-          response.data.message || "Ghi nhận thanh toán thành công.",
+        message: response.data.message || "Ghi nhận thanh toán thành công.",
       });
     } catch (error) {
       setToast({
         type: "error",
-        message:
-          error.response?.data?.message || "Không thể tạo thanh toán.",
+        message: error.response?.data?.message || "Không thể tạo thanh toán.",
       });
     }
   };
-
-  if (isLoading && invoices.length === 0) {
-    return <Loading />;
-  }
-
   return (
     <>
-      {toast && (
-        <Toast
-          title={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {viewing && (
-        <InvoiceView
-          invoice={viewing}
-          isOpen={viewing !== null}
-          onClose={() => setIsViewing(null)}
-        />
-      )}
+      {viewing && <InvoiceView invoice={viewing} isOpen={viewing !== null} onClose={() => setIsViewing(null)} />}
 
       {editing && (
         <InvoiceEdit
@@ -199,9 +182,7 @@ export default function InvoiceList() {
 
       <ConfirmDialog
         title="Xóa hóa đơn"
-        message={`Bạn có chắc muốn xóa hóa đơn ${
-          deleting?.invoice_code || ""
-        } không?`}
+        message={`Bạn có chắc muốn xóa hóa đơn ${deleting?.invoice_code || ""} không?`}
         isOpen={deleting !== null}
         loading={isDeleting}
         onCancel={() => {
@@ -214,10 +195,41 @@ export default function InvoiceList() {
 
       <ContentLayout
         title="Quản lý hóa đơn"
-        action={
-          <Button onClick={() => navigate("/admin/invoice/create")}>
-            Thêm mới
-          </Button>
+        action={<Button onClick={() => navigate("/admin/invoice/create")}>Thêm mới</Button>}
+        toolbar={
+          <div className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 dark:border-slate-600 dark:bg-slate-800">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select name="filter" id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Chưa thanh toán</option>
+            <option value="1">Chờ duyệt</option>
+            <option value="2">Một phần</option>
+            <option value="3">Hoàn thành</option>
+            <option value="4">Quá hạn</option>
+          </select>
         }
       >
         <TableLayout>
@@ -237,14 +249,23 @@ export default function InvoiceList() {
           </Thead>
 
           <Tbody>
-            {invoices.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td colSpan={10}>Chưa có dữ liệu</Td>
+                <td className="text-center" colSpan={10}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : invoices.length === 0 ? (
+              <Tr>
+                <td className="text-center text-lg p-3" colSpan={10}>
+                  Chưa có dữ liệu
+                </td>
               </Tr>
             ) : (
               invoices.map((invoice) => {
                 const status = getStatus(invoice);
-                const canEditOrDelete = Number(invoice.status) === 0;
+                const canEditOrDelete = invoice.status === 0;
+                const donePayment = invoice.status === 3;
 
                 return (
                   <Tr key={invoice.id}>
@@ -256,9 +277,7 @@ export default function InvoiceList() {
                     <Td>{formatCurrency(invoice.remain_amount)}</Td>
 
                     <Td>
-                      <span
-                        className={`inline-block rounded-xl px-3 py-1 text-sm font-medium ${status.color}`}
-                      >
+                      <span className={`inline-block rounded-xl px-3 py-1 text-sm font-medium ${status.color}`}>
                         {status.text}
                       </span>
                     </Td>
@@ -267,30 +286,21 @@ export default function InvoiceList() {
 
                     <Td>
                       <div className="flex items-center justify-center gap-5">
-                        <button
-                          className="text-blue-500 hover:text-blue-700"
-                          type="button"
-                          title="Xem chi tiết"
-                          onClick={() => setIsViewing(invoice)}
-                        >
+                        <button className="text-blue-500 hover:text-blue-700" type="button" title="Xem chi tiết"
+                          onClick={() => setIsViewing(invoice)}>
                           <Eye size={20} />
                         </button>
 
                         <button
                           className="text-yellow-500 hover:text-yellow-700 disabled:cursor-not-allowed disabled:opacity-40"
-                          type="button"
-                          title="Cập nhật"
-                          disabled={!canEditOrDelete}
-                          onClick={() => setEditing(invoice)}
-                        >
+                          type="button" title="Cập nhật" disabled={!canEditOrDelete}
+                          onClick={() => setEditing(invoice)}>
                           <Pencil size={20} />
                         </button>
 
                         <button
                           className="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-                          type="button"
-                          title="Xóa"
-                          disabled={!canEditOrDelete}
+                          type="button" title="Xóa" disabled={!canEditOrDelete}
                           onClick={() => setDeleting(invoice)}
                         >
                           <Trash2 size={20} />
@@ -299,15 +309,15 @@ export default function InvoiceList() {
                     </Td>
 
                     <Td>
-                      <Button
-                        onClick={() => setIsPayment(invoice)}
-                        disabled={
-                          Number(invoice.status) === 1 ||
-                          Number(invoice.status) === 3
-                        }
-                      >
-                        Thanh toán
-                      </Button>
+                      {!donePayment && (
+                        <Button
+                          onClick={() => setIsPayment(invoice)}
+                          disabled={Number(invoice.status) === 1 || Number(invoice.status) === 3}
+                          className="disabled:bg-slate-300 disabled:cursor-not-allowed"
+                        >
+                          Thanh toán
+                        </Button>
+                      )}
                     </Td>
                   </Tr>
                 );
@@ -328,47 +338,31 @@ export default function InvoiceList() {
             <div className="flex flex-col gap-3">
               <div className="rounded-xl border bg-slate-100 p-3 dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex flex-col items-center border-b pb-3 dark:border-slate-700">
-                  <span className="text-xl font-semibold">
-                    THANH TOÁN HÓA ĐƠN
-                  </span>
+                  <span className="text-xl font-semibold">THANH TOÁN HÓA ĐƠN</span>
 
                   <span>
-                    Số hóa đơn:{" "}
-                    <span className="font-semibold">
-                      {isPayment.invoice_code}
-                    </span>
+                    Số hóa đơn: <span className="font-semibold">{isPayment.invoice_code}</span>
                   </span>
                 </div>
 
                 <div className="mt-3">
                   <p>
-                    Tên khách hàng:{" "}
-                    <span className="font-semibold">
-                      {isPayment.contracts?.tenants?.name}
-                    </span>
+                    Tên khách hàng: <span className="font-semibold">{isPayment.contracts?.tenants?.name}</span>
                   </p>
 
                   <p>
-                    Phòng:{" "}
-                    <span className="font-semibold">
-                      {isPayment.rooms?.room_name}
-                    </span>
+                    Phòng: <span className="font-semibold">{isPayment.rooms?.room_name}</span>
                   </p>
 
                   <p>
-                    Tháng hóa đơn:{" "}
-                    <span className="font-semibold">
-                      {isPayment.bill_month}
-                    </span>
+                    Tháng hóa đơn: <span className="font-semibold">{isPayment.bill_month}</span>
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 rounded-xl border p-3 dark:border-slate-700">
                 <span>Tổng hóa đơn:</span>
-                <span className="text-right font-semibold">
-                  {formatCurrency(isPayment.total_amount)}
-                </span>
+                <span className="text-right font-semibold">{formatCurrency(isPayment.total_amount)}</span>
 
                 <span>Đã thanh toán:</span>
                 <span className="text-right font-semibold text-green-600 dark:text-green-400">
@@ -382,17 +376,11 @@ export default function InvoiceList() {
               </div>
 
               <div>
-                <label
-                  htmlFor="amount"
-                  className="mb-1 block font-semibold"
-                >
+                <label htmlFor="amount" className="mb-1 block font-semibold">
                   Số tiền nhận
                 </label>
 
-                <input
-                  id="amount"
-                  name="amount"
-                  type="number"
+                <input id="amount" name="amount" type="number"
                   max={Number(isPayment.remain_amount)}
                   value={formPayment.amount}
                   onChange={handleChangePayment}
@@ -402,17 +390,11 @@ export default function InvoiceList() {
               </div>
 
               <div>
-                <label
-                  htmlFor="payment_note"
-                  className="mb-1 block font-semibold"
-                >
+                <label htmlFor="payment_note" className="mb-1 block font-semibold">
                   Ghi chú
                 </label>
 
-                <textarea
-                  id="payment_note"
-                  name="note"
-                  rows={2}
+                <textarea id="payment_note" name="note" rows={2}
                   value={formPayment.note}
                   onChange={handleChangePayment}
                   placeholder="Nhập ghi chú..."
@@ -421,14 +403,11 @@ export default function InvoiceList() {
               </div>
 
               <div className="flex justify-end gap-3">
-                <Button
-                  type="button"
-                  className="bg-slate-400 hover:bg-slate-600"
+                <Button type="button" className="bg-slate-400 hover:bg-slate-600"
                   onClick={() => {
                     setIsPayment(null);
                     setFormPayment(initForm);
-                  }}
-                >
+                  }}>
                   Hủy
                 </Button>
 
@@ -441,11 +420,7 @@ export default function InvoiceList() {
         )}
       </ContentLayout>
 
-      <Paginate
-        page={page}
-        setPage={setPage}
-        totalPage={totalPage}
-      />
+      <Paginate page={page} setPage={setPage} totalPage={totalPage} />
     </>
   );
 }
@@ -455,31 +430,33 @@ const getStatus = (invoice) => {
 
   if (status === 0) {
     return {
-      text: "Chờ thanh toán",
-      color:
-        "bg-red-100 text-red-500 dark:bg-red-950 dark:text-red-300",
+      text: "Chưa thanh toán",
+      color: "bg-red-100 text-red-500 dark:bg-red-950 dark:text-red-300",
     };
   }
 
   if (status === 1) {
     return {
       text: "Chờ duyệt",
-      color:
-        "bg-yellow-100 text-yellow-500 dark:bg-yellow-950 dark:text-yellow-300",
+      color: "bg-yellow-100 text-yellow-500 dark:bg-yellow-950 dark:text-yellow-300",
     };
   }
 
   if (status === 2) {
     return {
       text: "Một phần",
-      color:
-        "bg-blue-100 text-blue-500 dark:bg-blue-950 dark:text-blue-300",
+      color: "bg-blue-100 text-blue-500 dark:bg-blue-950 dark:text-blue-300",
+    };
+  }
+  if (status === 4) {
+    return {
+      text: "Quá hạn",
+      color: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
     };
   }
 
   return {
     text: "Hoàn thành",
-    color:
-      "bg-green-100 text-green-500 dark:bg-green-950 dark:text-green-300",
+    color: "bg-green-100 text-green-500 dark:bg-green-950 dark:text-green-300",
   };
 };

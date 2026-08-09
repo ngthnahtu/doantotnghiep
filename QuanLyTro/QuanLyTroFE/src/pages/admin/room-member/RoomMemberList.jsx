@@ -178,6 +178,7 @@ export default function RoomMemberList({ contract, onClose }) {
   };
 
   if (!contract) return null;
+  const isActiveContract = Number(contract.status) === 0;
 
   return (
     <>
@@ -214,8 +215,11 @@ export default function RoomMemberList({ contract, onClose }) {
               <p className="font-medium">{contract.tenants?.name ?? "Không xác định"}</p>
             </div>
 
-            <Button type="button" onClick={openCreateModal}>
-              <span className="flex items-center gap-2">Thêm mới</span>
+            <Button type="button" onClick={openCreateModal} disabled={!isActiveContract} 
+            className="disabled:cursor-not-allowed disabled:opacity-40">
+              <span className="flex items-center gap-2">
+                Thêm mới
+                </span>
             </Button>
           </div>
 
@@ -248,6 +252,7 @@ export default function RoomMemberList({ contract, onClose }) {
                   ) : (
                     members.map((member) => (
                       <tr key={member.id} className="border-t border-slate-200 dark:border-slate-700">
+
                         <td className="p-3 text-center">{member.name}</td>
 
                         <td className="p-3 text-center">{member.relationship || "Chưa cập nhật"}</td>
@@ -258,26 +263,25 @@ export default function RoomMemberList({ contract, onClose }) {
                               type="button"
                               title="Xem chi tiết"
                               className="text-blue-500 hover:text-blue-700"
-                              onClick={() => setViewingMember(member)}
-                            >
+                              onClick={() => setViewingMember(member)}>
                               <Eye size={20} />
                             </button>
 
                             <button
                               type="button"
                               title="Chỉnh sửa"
-                              className="text-yellow-500 hover:text-yellow-700"
+                              className="text-yellow-500 hover:text-yellow-700 disabled:cursor-not-allowed disabled:opacity-40"
                               onClick={() => openEditModal(member)}
-                            >
+                              disabled={!isActiveContract}>
                               <Pencil size={20} />
                             </button>
 
                             <button
                               type="button"
                               title="Xóa"
-                              className="text-red-500 hover:text-red-700"
+                              className="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                               onClick={() => setDeletingMember(member)}
-                            >
+                              disabled={!isActiveContract}>
                               <Trash2 size={20} />
                             </button>
                           </div>
@@ -408,7 +412,6 @@ export default function RoomMemberList({ contract, onClose }) {
       {viewingMember && (
         <Modal title="Chi tiết người ở cùng" isOpen={true} onClose={() => setViewingMember(null)}>
           <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <MemberInfo label="Mã thành viên" value={`#${viewingMember.id}`} />
             <MemberInfo label="Họ và tên" value={viewingMember.name} />
             <MemberInfo label="Ngày sinh" value={formatDate(viewingMember.birth)} />
             <MemberInfo label="Giới tính" value={genderList[Number(viewingMember.gender)] || "Không xác định"} />

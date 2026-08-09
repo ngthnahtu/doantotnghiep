@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Search, Trash2, X } from "lucide-react";
 import Toast from "../../../components/common/Toast";
 import Loading from "../../../components/common/Loading";
 import Paginate from "../../../components/common/Paginate";
@@ -11,18 +11,11 @@ import { createRoom, deleteRoom, getRooms, updateRoom } from "../../../services/
 import { formatCurrency } from "../../../utils/formatCurrency";
 import RoomView from "./RoomView";
 import RoomModal from "./RoomModal";
+import { formatNumber } from "../../../utils/formatNumber";
 
 const statusList = ["Trống", "Đang thuê", "Bảo trì"];
 
-const initialRoomForm = {
-  room_name: "",
-  floor: "",
-  base_price: "",
-  area: "",
-  status: 0,
-  image: null,
-  description: "",
-};
+const initialRoomForm = { room_name: "", floor: "", base_price: "", area: "", status: 0, image: null, description: "" };
 
 export default function RoomList() {
   const [rooms, setRooms] = useState([]);
@@ -31,6 +24,9 @@ export default function RoomList() {
 
   const [page, setPage] = useState(1);
   const [totalPage, setTotalPage] = useState(1);
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("");
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [roomForm, setRoomForm] = useState(initialRoomForm);
@@ -43,14 +39,22 @@ export default function RoomList() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      setSearch(keyword.trim());
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  useEffect(() => {
     fetchRooms();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchRooms = async () => {
     try {
       setIsLoading(true);
 
-      const response = await getRooms(page);
+      const response = await getRooms(page, search, filter);
 
       setRooms(response.data.data.data);
       setTotalPage(response.data.data.last_page);
@@ -62,6 +66,14 @@ export default function RoomList() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const clearSearch = () => {
+    setKeyword("");
+    if (page !== 1) {
+      setPage(1);
+    }
+    setSearch("");
   };
 
   const handleFormChange = (event) => {
@@ -201,10 +213,6 @@ export default function RoomList() {
     }));
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   return (
     <>
       <ConfirmDialog
@@ -224,13 +232,53 @@ export default function RoomList() {
 
       {viewingRoom && <RoomView viewingRoom={viewingRoom} onClose={() => setViewingRoom(null)} />}
 
-      <ContentLayout title="Quản lý phòng" action={<Button onClick={openCreateModal}>Thêm mới</Button>}>
+      <ContentLayout
+        title="Quản lý phòng"
+        action={<Button onClick={openCreateModal}>Thêm mới</Button>}
+        toolbar={
+          <div className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 dark:border-slate-600 dark:bg-slate-800">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+              }}
+            />
+            {keyword && (
+              <button onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Trống</option>
+            <option value="1">Đang thuê</option>
+            <option value="2">Bảo trì</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
-              <Th>ID</Th>
               <Th>Tên phòng</Th>
               <Th>Tầng</Th>
+              <Th>Diện tích (m²)</Th>
               <Th>Giá thuê</Th>
               <Th>Trạng thái</Th>
               <Th>#</Th>
@@ -238,69 +286,79 @@ export default function RoomList() {
           </Thead>
 
           <Tbody>
-            {rooms.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td className="text-center" colSpan={6}>
+                <td className="text-center p-3" colSpan={6}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : rooms.length === 0 ? (
+              <Tr>
+                <td className="text-center p-3 text-lg" colSpan={6}>
                   Chưa có dữ liệu
-                </Td>
+                </td>
               </Tr>
             ) : (
-              rooms.map((roomItem) => (
-                <Tr key={roomItem.id}>
-                  <Td>{roomItem.id}</Td>
+              rooms.map((roomItem) => {
+                const canDelete = roomItem.status !== 1;
+                return (
+                  <Tr key={roomItem.id}>
+                    <Td>{roomItem.room_name}</Td>
 
-                  <Td>{roomItem.room_name}</Td>
+                    <Td className="text-center">{roomItem.floor}</Td>
 
-                  <Td className="text-center">{roomItem.floor}</Td>
+                    <Td className="text-center">{formatNumber(roomItem.area)}</Td>
 
-                  <Td>{formatCurrency(roomItem.base_price)}</Td>
+                    <Td>{formatCurrency(roomItem.base_price)}</Td>
 
-                  <Td>
-                    <span
-                      className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${
-                        Number(roomItem.status) === 0
-                          ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                          : Number(roomItem.status) === 1
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
-                      }`}
-                    >
-                      {statusList[Number(roomItem.status)] || "Không xác định"}
-                    </span>
-                  </Td>
-
-                  <Td>
-                    <div className="flex items-center justify-center gap-10">
-                      <button
-                        type="button"
-                        className="text-blue-500 hover:text-blue-700"
-                        onClick={() => setViewingRoom(roomItem)}
-                        title="Xem chi tiết"
+                    <Td>
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${
+                          Number(roomItem.status) === 0
+                            ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                            : Number(roomItem.status) === 1
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
+                        }`}
                       >
-                        <Eye size={20} />
-                      </button>
+                        {statusList[Number(roomItem.status)] || "Không xác định"}
+                      </span>
+                    </Td>
 
-                      <button
-                        type="button"
-                        className="text-yellow-500 hover:text-yellow-700"
-                        onClick={() => openEditModal(roomItem)}
-                        title="Chỉnh sửa"
-                      >
-                        <Pencil size={20} />
-                      </button>
+                    <Td>
+                      <div className="flex items-center justify-center gap-10">
+                        <button
+                          type="button"
+                          className="text-blue-500 hover:text-blue-700"
+                          onClick={() => setViewingRoom(roomItem)}
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={20} />
+                        </button>
 
-                      <button
-                        type="button"
-                        className="text-red-500 hover:text-red-700"
-                        onClick={() => setDeletingRoom(roomItem)}
-                        title="Xóa"
-                      >
-                        <Trash2 size={20} />
-                      </button>
-                    </div>
-                  </Td>
-                </Tr>
-              ))
+                        <button
+                          type="button"
+                          className="text-yellow-500 hover:text-yellow-700"
+                          onClick={() => openEditModal(roomItem)}
+                          title="Chỉnh sửa"
+                        >
+                          <Pencil size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          onClick={() => setDeletingRoom(roomItem)}
+                          disabled={!canDelete}
+                          title="Xóa"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })
             )}
           </Tbody>
         </TableLayout>

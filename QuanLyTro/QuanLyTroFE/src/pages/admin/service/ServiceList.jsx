@@ -5,7 +5,7 @@ import ContentLayout from "../../../layouts/ContentLayout";
 import Button from "../../../components/common/Button";
 import { TableLayout, Tbody, Td, Th, Thead, Tr } from "../../../components/common/TableLayout";
 import { formatCurrency } from "../../../utils/formatCurrency";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Search, Trash2, X } from "lucide-react";
 import Loading from "../../../components/common/Loading";
 import Paginate from "../../../components/common/Paginate";
 import Modal from "../../../components/common/Modal";
@@ -27,6 +27,9 @@ export default function ServiceList() {
   const [totalPage, setTotalPage] = useState(1);
 
   const [services, setServices] = useState([]);
+  const [keyword, setKeyword] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("");
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [serviceForm, setServiceForm] = useState(initialServiceForm);
@@ -37,13 +40,29 @@ export default function ServiceList() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      setSearch(keyword.trim());
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [keyword]);
+
+  const clearSearch = () => {
+    setSearch("");
+    setKeyword("");
+    if (page !== 1) {
+      setPage(1);
+    }
+  };
+
+  useEffect(() => {
     fetchServices();
-  }, [page]);
+  }, [page, search, filter]);
 
   const fetchServices = async () => {
     try {
       setIsLoading(true);
-      const response = await getServices(page);
+      const response = await getServices(page, search, filter);
       setServices(response.data.data.data);
       setTotalPage(response.data.data.last_page);
     } catch (error) {
@@ -56,12 +75,7 @@ export default function ServiceList() {
     }
   };
 
-  if (isLoading) {
-    return <Loading />;
-  }
-
   const handleFormChange = (event) => {
-    event.preventDefault();
     const { name, value } = event.target;
     setServiceForm((previousData) => ({
       ...previousData,
@@ -171,11 +185,48 @@ export default function ServiceList() {
 
       {toast && <Toast title={toast.message} type={toast.type} onClose={() => setToast(null)}></Toast>}
 
-      <ContentLayout title="Quản lý dịch vụ" action={<Button onClick={openCreateModal}>Thêm mới</Button>}>
+      <ContentLayout
+        title="Quản lý dịch vụ"
+        action={<Button onClick={openCreateModal}>Thêm mới</Button>}
+        toolbar={
+          <div className="flex items-center gap-2 border border-slate-300 rounded-lg px-3 w-50 dark:border-slate-600 dark:bg-slate-800">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              className="w-full text-sm outline-none dark:bg-slate-800 dark:text-slate-100"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            {keyword && (
+              <button type="button" onClick={clearSearch}>
+                <X />
+              </button>
+            )}
+          </div>
+        }
+        filter={
+          <select
+            name="filter"
+            id="filter"
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            value={filter}
+            className="text-center border border-slate-300 rounded-lg
+            dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">Toàn bộ</option>
+            <option value="0">Cố định</option>
+            <option value="1">Theo số</option>
+            <option value="2">Theo đầu người</option>
+          </select>
+        }
+      >
         <TableLayout>
           <Thead>
             <Tr>
-              <Th>ID</Th>
               <Th>Tên dịch vụ</Th>
               <Th>Đơn giá</Th>
               <Th>Phân loại</Th>
@@ -183,63 +234,72 @@ export default function ServiceList() {
             </Tr>
           </Thead>
           <Tbody>
-            {services.length === 0 ? (
+            {isLoading ? (
               <Tr>
-                <Td className="text-center" colSpan={5}>
+                <td className="text-center" colSpan={4}>
+                  <Loading />
+                </td>
+              </Tr>
+            ) : services.length === 0 ? (
+              <Tr>
+                <td className="text-center text-lg p-3" colSpan={4}>
                   Chưa có dữ liệu
-                </Td>
+                </td>
               </Tr>
             ) : (
-              services.map((service) => (
-                <Tr key={service.id}>
-                  <Td>{service.id}</Td>
-                  <Td>{service.name}</Td>
-                  <Td>{formatCurrency(service.price)}</Td>
-                  <Td>
-                    <span
-                      className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${
-                        Number(service.charge_type) === 0
-                          ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                          : Number(service.charge_type) === 1
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
-                      }`}
-                    >
-                      {chargeType[Number(service.charge_type)] || "Không xác định"}
-                    </span>
-                  </Td>
-                  <Td>
-                    <div className="flex items-center justify-center gap-10">
-                      <button
-                        type="button"
-                        className="text-yellow-500 hover:text-yellow-700"
-                        onClick={() => {
-                          openEditModal(service);
-                        }}
-                        title="Chỉnh sửa"
+              services.map((service) => {
+                const canDelete = !service?.contract_services || service?.contract_services?.length === 0;
+                return (
+                  <Tr key={service.id}>
+                    <Td>{service.name}</Td>
+                    <Td>{formatCurrency(service.price)}</Td>
+                    <Td>
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${
+                          Number(service.charge_type) === 0
+                            ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                            : Number(service.charge_type) === 1
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
+                        }`}
                       >
-                        <Pencil size={20}></Pencil>
-                      </button>
+                        {chargeType[Number(service.charge_type)] || "Không xác định"}
+                      </span>
+                    </Td>
+                    <Td>
+                      <div className="flex items-center justify-center gap-10">
+                        <button
+                          type="button"
+                          className="text-yellow-500 hover:text-yellow-700"
+                          onClick={() => {
+                            openEditModal(service);
+                          }}
+                          title="Chỉnh sửa"
+                        >
+                          <Pencil size={20}></Pencil>
+                        </button>
 
-                      <button
-                        type="button"
-                        className="text-red-500 hover:text-red-700"
-                        onClick={() => {
-                          setDeletingService(service);
-                        }}
-                        title="Xóa"
-                      >
-                        <Trash2 size={20}></Trash2>
-                      </button>
-                    </div>
-                  </Td>
-                </Tr>
-              ))
+                        <button
+                          type="button"
+                          className="text-red-500 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          onClick={() => {
+                            setDeletingService(service);
+                          }}
+                          disabled={!canDelete}
+                          title="Xóa"
+                        >
+                          <Trash2 size={20}></Trash2>
+                        </button>
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })
             )}
           </Tbody>
         </TableLayout>
       </ContentLayout>
-      
+
       <Paginate page={page} totalPage={totalPage} setPage={setPage}></Paginate>
 
       {isFormModalOpen && (
@@ -289,7 +349,7 @@ export default function ServiceList() {
                     onChange={handleFormChange}
                     className="w-full text-center rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   >
-                    <option>---Chọn---</option>
+                    <option value="">---Chọn---</option>
                     <option value={0}>Cố định</option>
                     <option value={1}>Theo số</option>
                     <option value={2}>Theo đầu người</option>
@@ -305,7 +365,6 @@ export default function ServiceList() {
                   {isSaving ? "Đang lưu..." : editingServiceId == null ? "Thêm mới" : "Cập nhật"}
                 </Button>
               </div>
-              
             </div>
           </form>
         </Modal>
