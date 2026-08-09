@@ -10,7 +10,8 @@ export default function Role({allowRole}){
     }
 
     if(allowRole !== undefined && user.role !== allowRole){
-        return user.role === 0 ? <Navigate to="/admin/dashboard" replace /> : <Navigate to="/tenant/contract" replace/>
+        return user.role === 0 ? <Navigate to="/admin/dashboard" replace /> 
+        : <Navigate to="/tenant/contract" replace/>
     }
     return <Outlet/>
 }

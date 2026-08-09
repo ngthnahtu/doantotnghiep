@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { login } from "../../services/authService";
@@ -24,6 +24,20 @@ export default function Login() {
     }));
   };
 
+  useEffect(()=>{
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    if(token && user){
+      if(user.role === 0){
+        navigate("/admin/dashboard", {replace:true});
+      }
+      if(user.role === 1){
+        navigate("/tenant/contract", {replace:true});
+      }
+    }
+  },[navigate]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -35,7 +49,7 @@ export default function Login() {
       const token = response.data.access_token;
       const user = response.data.user;
 
-      localStorage.setItem("token", token);
+      localStorage.setItem("token", token); 
       localStorage.setItem("user", JSON.stringify(user));
 
       setTimeout(() => {
@@ -47,6 +61,7 @@ export default function Login() {
           navigate("/tenant/contract");
         }
       }, 300);
+
       setToast({
         type: "success",
         message: response.data.message,

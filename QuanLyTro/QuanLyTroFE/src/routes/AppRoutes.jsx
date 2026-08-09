@@ -9,7 +9,6 @@ import NotificationList from "../pages/admin/notification/NotificationList";
 import PaymentList from "../pages/admin/payment/PaymentList";
 import Report from "../pages/admin/report/Report";
 import RoomList from "../pages/admin/room/RoomList";
-import RoomMemberList from "../pages/admin/room-member/RoomMemberList";
 import ServiceList from "../pages/admin/service/ServiceList";
 import Setting from "../pages/admin/setting/Setting";
 
