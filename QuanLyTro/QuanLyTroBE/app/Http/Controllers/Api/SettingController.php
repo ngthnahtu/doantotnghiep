@@ -37,11 +37,21 @@ class SettingController extends Controller
         $user = User::findOrFail(Auth::id());
 
         $rules = [
-            'email' => ['nullable','email','max:191',
-                Rule::unique('users', 'email')->ignore($user->id),],
+            'email' => [
+                'nullable',
+                'email',
+                'max:191',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
         ];
         if ((int) $user->role === 0) {
-            $rules['phone'] = ['required','string','max:15',Rule::unique('users', 'phone')->ignore($user->id),];
+            $rules['phone'] = [
+                'required',
+                'string',
+                'max:15',
+                'regex:/^(0)[0-9]{9,14}$/',
+                Rule::unique('users', 'phone')->ignore($user->id),
+            ];
         }
 
         $validated = $request->validate($rules, [
@@ -50,6 +60,7 @@ class SettingController extends Controller
             'phone.max' => 'Số điện thoại không hợp lệ.',
             'email.email' => 'Email không đúng định dạng.',
             'email.unique' => 'Email đã được sử dụng.',
+            'phone.regex' => 'Số điện thoại phải bắt đầu bằng số 0, có từ 10 đến 15 chữ số và chỉ chứa số.',
         ]);
 
         if ((int) $user->role === 0) {
@@ -75,16 +86,8 @@ class SettingController extends Controller
         $user = User::findOrFail(Auth::id());
 
         $validated = $request->validate([
-            'current_password' => [
-                'required',
-                'string',
-            ],
-            'password' => [
-                'required',
-                'string',
-                'min:6',
-                'confirmed',
-            ],
+            'current_password' => ['required', 'string',],
+            'password' => ['required', 'string', 'min:6', 'confirmed',],
         ], [
             'current_password.required' => 'Vui lòng nhập mật khẩu hiện tại.',
             'password.required' => 'Vui lòng nhập mật khẩu mới.',
@@ -100,9 +103,8 @@ class SettingController extends Controller
                 'message' => 'Mật khẩu hiện tại không chính xác.',
             ], 422);
         }
-        $user->password = Hash::make(
-            $validated['password']
-        );
+        
+        $user->password = $validated['password'];
 
         $user->save();
 
@@ -123,7 +125,7 @@ class SettingController extends Controller
 
         $validated = $request->validate([
             'house_name' => ['nullable', 'string', 'max:191'],
-            'house_address' => ['nullable', 'string', 'max:255'],
+            'house_address' => ['nullable', 'string', 'max:191'],
             'house_phone' => ['nullable', 'string', 'max:15'],
             'bank_name' => ['nullable', 'string', 'max:191'],
             'bank_number' => ['nullable', 'string', 'max:50'],

@@ -22,10 +22,16 @@ class DashboardController extends Controller
         if (!$user || $user->role !== 0) {
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
+
+        Invoice::whereIn('status', [0, 2])->where('remain_amount', '>', 0)->whereDate('due_date', '<', today())
+            ->update([
+                'status' => 4
+            ]);
+
         $totalRoom = Room::count();
         $rentRoom = Room::where('status', 1)->count();
         $emptyRoom = Room::where('status', 0)->count();
-        $roomRate = $totalRoom > 0 ? round(($rentRoom / $totalRoom) * 100, 1): 0;
+        $roomRate = $totalRoom > 0 ? round(($rentRoom / $totalRoom) * 100, 1) : 0;
 
         $revenueMonth = Payment::where('status', 1)->whereMonth('approved_at', now()->month)
             ->whereYear('approved_at', now()->year)->sum('amount');
@@ -42,7 +48,7 @@ class DashboardController extends Controller
                 'room_rate' => $roomRate,
                 'total_tenants' => Tenant::where('status', 1)->count(),
                 'revenue_month' => $revenueMonth,
-                'unpaid_invoices' => Invoice::whereIn('status', [0, 2])->count(),
+                'unpaid_invoices' => Invoice::whereIn('status', [0, 1, 2, 4])->count(),
                 'open_issues' => Issue::whereIn('status', [0, 1])->count(),
                 'invoice_recent' => $invoiceRecent,
                 'issue_recent' => $issueRecent,

@@ -18,6 +18,7 @@ class User extends Authenticatable
 
     protected $table = 'users';
     protected $fillable = ['phone', 'email', 'password', 'role', 'is_active'];
+    
     // giấu khi  trả về json cho raeact
     protected $hidden = ['password'];
 

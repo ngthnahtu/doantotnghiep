@@ -14,24 +14,18 @@ use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Auth\AuthController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function (){
-
-    Route::get('/user',function(Request $request){
-        return $request->user();
-    });
     
     Route::post('/logout',[AuthController::class,'logout']);
     Route::apiResource('issues', IssueController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('room-members', Room_MemberController::class);
     
-    //them whereNumber tránh việc các route khai báo hàm thêm bị mất tác dụng(chỉ cho phép số)
     Route::get('contracts', [ContractController::class,'index']);
     Route::get('contracts/{id}',[ContractController::class,'show'])->whereNumber('id');
 
@@ -39,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function (){
     Route::get('invoices/{id}',[InvoiceController::class,'show'])->whereNumber('id');
     
     Route::apiResource('notification-users', Notification_UserController::class);
+    
     Route::get('notifications', [NotificationController::class,'index']);
     Route::get('notifications/{id}', [NotificationController::class,'show'])->whereNumber('id');
     

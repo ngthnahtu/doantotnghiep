@@ -17,6 +17,11 @@ class Room_MemberController extends Controller
     {
 
         $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'message' => 'Bạn chưa đăng nhập.'
+            ], 401);
+        }
         $contract_id = $request->query('contract_id');
         if (!$contract_id) {
             return response()->json(['message' => 'Vui lòng truyền mã hợp đồng để xem danh sách thành viên.'], 400);
@@ -58,7 +63,7 @@ class Room_MemberController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:191',
             'birth' => 'required|date',
-            'gender' => 'required|integer',
+            'gender' => 'required|integer|in:0,1',
             'address' => 'required|string|max:191',
             'phone' => ['nullable', 'string', 'max:15', 'regex:/^(0)[0-9]{9,14}$/'],
             'identity_number' => ['required', 'string', 'max:50',],
@@ -70,9 +75,18 @@ class Room_MemberController extends Controller
             'name.required' => 'Tên thành viên không được để trống.',
             'birth.required' => 'Ngày sinh không được để trống.',
             'phone.regex' => 'Số điện thoại phải bắt đầu bằng số 0, từ 10 kí tự và chỉ chứa số.',
-            'phone.unique' => 'Số điện thoại này đã tồn tại trên hệ thống.',
             'identity_number.required' => 'Số CCCD/CMND không được để trống.',
         ]);
+
+        $contract = Contract::find($validated['contract_id']);
+        if (!$contract || (int)$contract->status !== 0) {
+            return response()->json([
+                'message' => 'Không thể thêm thành viên vì hợp đồng không còn hiệu lực.'
+            ], 422);
+        }
+
+        $validated['status'] = 0;
+
         $roomMember = Room_Member::create($validated);
         return response()->json([
             'message' => 'Thêm thành viên vào phòng thành công.',
@@ -113,15 +127,23 @@ class Room_MemberController extends Controller
                 'message' => 'Hành động không được phép.'
             ], 403);
         }
+
         $member = Room_Member::find($id);
         if (!$member) {
             return response()->json(['message' => 'Không tìm thấy thành viên này.'], 404);
         }
 
+        $contract = Contract::find($member->contract_id);
+        if (!$contract || (int) $contract->status !== 0) {
+            return response()->json([
+                'message' => 'Không thể sửa thành viên vì hợp đồng không còn hiệu lực.'
+            ], 422);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:191',
             'birth' => 'required|date',
-            'gender' => 'required|integer',
+            'gender' => 'required|integer|in:0,1',
             'address' => 'required|string|max:191',
             'phone' => ['nullable', 'string', 'max:15', 'regex:/^(0)[0-9]{9,14}$/'],
             'identity_number' => ['required', 'string', 'max:50'],
@@ -151,9 +173,17 @@ class Room_MemberController extends Controller
                 'message' => 'Hành động không được phép.'
             ], 403);
         }
+
         $roomMember = Room_Member::find($id);
         if (!$roomMember) {
             return response()->json(['message' => 'Không tìm thấy thành viên này.'], 404);
+        }
+
+        $contract = Contract::find($roomMember->contract_id);
+        if (!$contract || (int) $contract->status !== 0) {
+            return response()->json([
+                'message' => 'Không thể xóa thành viên vì hợp đồng không còn hiệu lực.'
+            ], 422);
         }
 
         $roomMember->delete();

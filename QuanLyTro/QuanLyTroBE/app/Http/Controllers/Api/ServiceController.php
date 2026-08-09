@@ -12,16 +12,32 @@ class ServiceController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         if (!$user || $user->role !== 0) {
-            return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
+            return response()->json([
+                "message" => "Bạn không có quyền truy cập nội dung này."
+            ], 403);
         }
-        $services = Service::orderBy('id', 'asc')->paginate(8);
+
+        $search = trim($request->search ?? "");
+        $filter = trim($request->filter ?? '');
+
+        $services = Service::query()->with('contract_services')
+        ->when($search !== '', function ($query) use($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('price', 'like', "%{$search}%");
+            });
+        })
+        ->when($filter !== '', function($q) use($filter){
+            $q->where('charge_type',$filter);
+        })
+        ->orderBy('charge_type', 'asc')->paginate(8);
         return response()->json([
-            'message' => 'Tải danh sách dịch vụ thành công.',
-            'data' => $services
+            "message" => "Tải danh sách dịch vụ thành công.",
+            "data" => $services
         ], 200);
     }
 
@@ -38,14 +54,15 @@ class ServiceController extends Controller
             [
                 'name' => 'required|string|max:191',
                 'price' => 'required|numeric|min:0',
-                'charge_type' => 'required|integer'
+                'charge_type' => 'required|integer|in:0,1,2'
             ],
             [
                 'name.required' => 'Tên dịch vụ không được để trống.',
                 'price.required' => 'Giá dịch vụ không được để trống.',
                 'price.numeric' => 'Giá dịch vụ phải là số.',
                 'price.min' => 'Giá dịch vụ không được là số âm.',
-                'charge_type.required' => 'Đơn vị tính không được bỏ trống.'
+                'charge_type.required' => 'Đơn vị tính không được bỏ trống.',
+                'charge_type.in' => 'Hình thức tính phí không hợp lệ.'
             ]
         );
         $service = Service::create($validated);
@@ -95,17 +112,30 @@ class ServiceController extends Controller
             [
                 'name' => 'required|string|max:191',
                 'price' => 'required|numeric|min:0',
-                'charge_type' => 'required|integer'
+                'charge_type' => 'required|integer|in:0,1,2'
             ],
             [
                 'name.required' => 'Tên dịch vụ không được để trống.',
                 'price.required' => 'Giá dịch vụ không được để trống.',
                 'price.numeric' => 'Giá dịch vụ phải là số.',
                 'price.min' => 'Giá dịch vụ không được là số âm.',
-                'charge_type.required' => 'Đơn vị tính không được bỏ trống.'
+                'charge_type.required' => 'Đơn vị tính không được bỏ trống.',
+                'charge_type.in' => 'Hình thức tính phí không hợp lệ.'
             ]
         );
+
+        $isChargeType = (int) $service->charge_type !== (int) $validated['charge_type'];
+
+        $isUsed = $service->contract_services()->exists() || $service->invoice_details()->exists();
+
+        if ($isChargeType && $isUsed) {
+            return response()->json([
+                'message' => 'Không thể thay đổi cách tính phí vì dịch vụ đã được sử dụng.'
+            ], 400);
+        }
+
         $service->update($validated);
+
         return response()->json([
             'message' => "Cập nhật thông tin dịch vụ {$service->name} thành công.",
             'data' => $service
@@ -145,8 +175,8 @@ class ServiceController extends Controller
         if (!$user || $user->role !== 0) {
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
-        
-        $services = Service::select('id', 'name', 'price','charge_type')->orderBy('charge_type')->get();
+
+        $services = Service::select('id', 'name', 'price', 'charge_type')->orderBy('charge_type')->get();
         return response()->json([
             'message' => 'Tải danh sách dịch vụ thành công.',
             'data' => $services

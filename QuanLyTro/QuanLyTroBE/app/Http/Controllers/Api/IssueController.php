@@ -19,9 +19,11 @@ class IssueController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
+        $search = trim($request->search ?? '');
+        $filter = trim($request->filter ?? '');
 
         if ($user->role === 1) {
             $tenant = $user->tenants;
@@ -30,10 +32,29 @@ class IssueController extends Controller
                     'message' => 'Không tìm thấy khách thuê này',
                 ], 404);
             }
-            $issue = Issue::where('tenant_id', $tenant->id)->orderBy('created_at', 'desc')->paginate(8);
+            $query = Issue::where('tenant_id', $tenant->id);
         } else {
-            $issue = Issue::orderBy('created_at', 'desc')->paginate(8);
+            $query = Issue::query();
         }
+        $query->when($search !== '', function ($query) use($search){
+            $query->where(function ($q) use ($search){
+                $q->where('title', 'like', "%{$search}%")
+                ->orWhere('description','like', "%{$search}%")
+                ->orWhere('created_at', 'like',"%{$search}%")
+                ->orWhereHas('rooms',function($qu) use($search){
+                    $qu->where('room_name', 'like', "%{$search}%");
+                })->orWhereHas('tenants', function($que) use($search){
+                    $que->where('name','like', "%{$search}%")
+                    ->orWhere('phone', 'like',"%{$search}%");
+                });
+            });
+        });
+
+        $query->when($filter !== '',function ($qu) use($filter){
+            $qu->where('status',$filter);
+        });
+
+        $issue = $query->with('rooms','tenants')->orderBy('created_at','desc')->paginate(8);
         return response()->json([
             'message' => 'Tải danh sách các sự cố thành công.',
             'data' => $issue
@@ -49,7 +70,7 @@ class IssueController extends Controller
         $user = Auth::user();
         $validated = $request->validate([
             'title' => 'required|string|max:191',
-            'description' => 'nullable|string|max:255',
+            'description' => 'nullable|string|max:191',
             'proof_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'note' => 'nullable|string|max:191',
         ], [
@@ -79,8 +100,8 @@ class IssueController extends Controller
 
                 $notification = Notification::create([
                     'title' => 'Sự cố: ' . $validated['title'],
-                    'content' => 'Có báo cáo sự cố từ phòng ' . $contract->rooms->room_name . ': ' . $validated['description']??"Không có mô tả",
-                    'type' => 1,
+                    'content' => 'Có báo cáo sự cố từ phòng ' . $contract->rooms->room_name . ': ' . ($validated['description'] ?? 'Không có mô tả'),
+                    'type' => 4,
                     'target_type' => 0
                 ]);
                 $admin = User::where('role', 0)->first();
@@ -142,11 +163,11 @@ class IssueController extends Controller
 
         $validated = $request->validate([
             'status' => 'required|integer|in:0,1,2',
-            'note' => 'nullable|string|max:255',
+            'note' => 'nullable|string|max:191',
         ], [
             'status.required' => 'Vui lòng cập nhật trạng thái xử lý.',
             'status.in' => 'Trạng thái xử lý không hợp lệ.',
-            'note.max' => 'Ghi chú không được vượt quá 255 kí tự.'
+            'note.max' => 'Ghi chú không được vượt quá 191 kí tự.'
         ]);
 
         try {
@@ -165,7 +186,7 @@ class IssueController extends Controller
                     $notification = Notification::create([
                         'title' => 'Cập nhật tiến độ sự cố: ' . $issue->title,
                         'content' => "Yêu cầu sửa chữa tại phòng của bạn hiện tại " . $statusText . ".",
-                        'type' => 1,
+                        'type' => 4,
                         'target_type' => false
                     ]);
 

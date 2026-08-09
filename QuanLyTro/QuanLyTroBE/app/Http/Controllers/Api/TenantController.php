@@ -17,13 +17,31 @@ class TenantController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         if (!$user || $user->role !== 0) {
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
-        $tenants = Tenant::with('users')->orderBy('id', 'asc')->paginate(8);
+
+        $search = trim($request->search ?? '');
+        $filter= trim($request->filter ?? '');
+
+        $tenants= Tenant::query()->with('users')
+        ->when($search !== '', function($query) use($search){
+            $query->where(function($q) use ($search){
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('identity_number', 'like', "%{$search}%")
+                ->orWhereHas('users',function($userquery) use ($search){
+                    $userquery->where('email', 'like',"%{$search}%");
+                });
+            });
+        })->when($filter !== '',function($q) use($filter){
+            $q->where('status',$filter);
+        })
+        ->orderBy('status','asc')->paginate(8);
+
         return response()->json([
             'message' => 'Tải danh sách khách thuê thành công.',
             'data' => $tenants
@@ -42,8 +60,8 @@ class TenantController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:191',
             'birth' => 'required|date',
-            'gender' => 'required|integer',
-            'address' => 'required|string|max:255',
+            'gender' => 'required|integer|in:0,1',
+            'address' => 'required|string|max:191',
             'phone' => [
                 'required',
                 'string',
@@ -66,8 +84,9 @@ class TenantController extends Controller
             'password.required' => 'Mật khẩu đăng nhập khởi tạo không được để trống.',
             'password.min' => 'Mật khẩu phải chứa ít nhất 6 ký tự.',
             'email.email' => 'Định dạng email không hợp lệ.',
+            'gender.in' => 'Giới tính không hợp lệ.',
         ]);
-        // Dùng DB::transaction để đảm bảo an toàn tuyệt đối: một bên lỗi là hủy toàn bộ, không tạo rác dữ liệu
+
         $tenant = DB::transaction(function () use ($validated) {
             $user = User::create([
                 'phone' => $validated['phone'],
@@ -133,11 +152,12 @@ class TenantController extends Controller
                 'message' => 'Không tìm thấy khách thuê này.'
             ], 404);
         }
+
         $validated = $request->validate([
             'name' => 'required|string|max:191',
             'birth' => 'required|date',
-            'gender' => 'required|integer',
-            'address' => 'required|string|max:255',
+            'gender' => 'required|integer|in:0,1',
+            'address' => 'required|string|max:191',
             'phone' => [
                 'required',
                 'string',
@@ -147,10 +167,10 @@ class TenantController extends Controller
                 Rule::unique('tenants', 'phone')->ignore($tenant->id, 'id')
             ],
             'identity_number' => ['required', 'string', 'max:50', Rule::unique('tenants', 'identity_number')->ignore($id)->whereNull('deleted_at')],
-            'status' => 'required|integer',
+            'status' => 'required|integer|in:0,1,2',
             'email' => 'nullable|email|max:191',
             'password' => 'nullable|string|min:6',
-            'is_active' => 'required|integer'
+            'is_active' => 'required|boolean'
         ], [
             'name.required' => 'Tên khách thuê không được để trống.',
             'birth.required' => 'Ngày sinh không được để trống.',
@@ -161,7 +181,10 @@ class TenantController extends Controller
             'identity_number.unique' => 'Số CCCD/CMND này đã được đăng ký.',
             'password.min' => 'Mật khẩu phải chứa ít nhất 6 ký tự.',
             'email.email' => 'Định dạng email không hợp lệ.',
-            'is_active.required' => 'Trạng thái không được để trống'
+            'is_active.required' => 'Trạng thái không được để trống',
+            'gender.in' => 'Giới tính không hợp lệ.',
+            'status.in' => 'Trạng thái khách thuê không hợp lệ.',
+            'is_active.boolean' => 'Trạng thái tài khoản không hợp lệ.',
         ]);
         try {
             $hasContractActive = $tenant->contracts()->where('status', 0)->exists();
@@ -192,11 +215,14 @@ class TenantController extends Controller
                             $userData['password'] = $validated['password'];
                         }
                         $user->update($userData);
+                        if(!$validated['is_active']){
+                            $user->tokens()->delete();
+                        }
                     }
                 }
             });
             return response()->json([
-                'message' => "Cập nhật thông tin khác thuê {$tenant->name} thành công.",
+                'message' => "Cập nhật thông tin khách thuê {$tenant->name} thành công.",
                 'data' => $tenant->load('users')
             ]);
         } catch (Throwable $e) {
@@ -224,7 +250,9 @@ class TenantController extends Controller
                 'message' => 'Không tìm thấy khách thuê này.'
             ], 404);
         }
-        $hasContract = $tenant->contracts()->exists();
+
+        $hasContract = $tenant->contracts()->withTrashed()->exists();
+
         if ($hasContract) {
             return response()->json([
                 'message' => 'Không thể xóa khách thuê này do đã từng có hợp đồng.'

@@ -13,13 +13,31 @@ class RoomController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         if (!$user || $user->role !== 0) {
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
-        $rooms = Room::orderBy('id', 'asc')->paginate(8);
+
+        $search = trim($request->search ?? '');
+        $filter = trim($request->filter ?? '');
+        $rooms = Room::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('room_name', 'like', "%{$search}%")
+                        ->orWhere('floor', 'like', "%{$search}%")
+                        ->orWhere('base_price', 'like', "%{$search}%")
+                        ->orWhere('area', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->when($filter !== '', function ($query) use ($filter) {
+                $query->where('status', $filter);
+            })
+            ->orderBy('floor', 'asc')
+            ->paginate(8);
+
         return response()->json([
             'message' => 'Tải danh sách phòng thành công.',
             'data' => $rooms
@@ -42,13 +60,14 @@ class RoomController extends Controller
             'area' => 'nullable|numeric|min:0',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'description' => 'nullable|string',
-            'status'=>'nullable'
+            'status' => 'nullable|integer|in:0,1,2'
         ], [
             'room_name.required' => 'Tên phòng không được để trống.',
             'floor.integer'      => 'Số tầng phải là số nguyên.',
             'base_price.numeric'  => 'Giá phòng bắt buộc phải là số.',
             'base_price.min'      => 'Giá phòng không được là số âm.',
             'area.numeric'       => 'Diện tích bắt buộc phải là số.',
+            'status.in' => 'Trạng thái phòng không hợp lệ.',
         ]);
 
         if ($request->hasFile('image')) {
@@ -104,7 +123,7 @@ class RoomController extends Controller
                 'floor' => 'nullable|integer|min:0',
                 'base_price' => 'nullable|numeric|min:0',
                 'area' => 'nullable|numeric|min:0',
-                'status' => 'required|integer',
+                'status' => 'required|integer|in:0,1,2',
                 'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
                 'description' => 'nullable|string',
             ],
@@ -115,21 +134,22 @@ class RoomController extends Controller
                 'base_price.min'      => 'Giá phòng không được là số âm.',
                 'area.numeric'       => 'Diện tích bắt buộc phải là số.',
                 'status.required'    => 'Trạng thái phòng không được để trống.',
+                'status.in' => 'Trạng thái phòng không hợp lệ.',
             ]
         );
+
         $hasContract = $room->contracts()->where('status', 0)->exists();
         if ($hasContract && $validated['status'] == 0) {
             return response()->json([
                 'message' => 'Không thể chuyển phòng về trạng thái trống khi còn hợp đồng hiệu lực.'
             ], 422);
         }
+
         if ($request->hasFile('image')) {
             if ($room->image) {
                 Storage::disk('public')->delete($room->image);
             }
-            $validated['image'] = $request
-                ->file('image')
-                ->store('rooms', 'public');
+            $validated['image'] = $request->file('image')->store('rooms', 'public');
         }
 
         $room->update($validated);
@@ -170,15 +190,16 @@ class RoomController extends Controller
         ], 200);
     }
 
-    public function options(){
+    public function options()
+    {
         $user = Auth::user();
         if (!$user || $user->role !== 0) {
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
-        $room=Room::where('status',0)->select('id','room_name','floor','base_price')->orderBy('room_name')->get();
+        $room = Room::where('status', 0)->select('id', 'room_name', 'floor', 'base_price')->orderBy('room_name')->get();
         return response()->json([
-            'message'=>"Tải danh sách phòng trống thành công.",
-            'data'=>$room
+            'message' => "Tải danh sách phòng trống thành công.",
+            'data' => $room
         ]);
     }
 }

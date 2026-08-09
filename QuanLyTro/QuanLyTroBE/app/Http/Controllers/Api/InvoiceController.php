@@ -22,12 +22,17 @@ class InvoiceController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         if (!$user) {
             return response()->json(['message' => 'Không tìm thấy người dùng này.'], 403);
         }
+
+        Invoice::whereIn('status', [0, 2])->where('remain_amount', '>', 0)->whereDate('due_date', '<', today())
+            ->update([
+                'status' => 4
+            ]);
 
         if ($user->role === 1) {
             $tenant = $user->tenants;
@@ -38,11 +43,33 @@ class InvoiceController extends Controller
             }
 
             $contractID = $tenant->contracts()->pluck('id');
-            $invoices = Invoice::whereIn('contract_id', $contractID)->orderBy('created_at', 'desc')->paginate(8);
+            $query = Invoice::whereIn('contract_id', $contractID);
         } else {
-            $invoices = Invoice::with('rooms','contracts.tenants','invoice_details.services')
-            ->orderBy('status', 'asc')->paginate(8);
+            $query = Invoice::query();
         }
+
+        $search = trim($request->search ?? '');
+        $filter = trim($request->filter ?? '');
+
+        $query->when($search !== '', function ($query) use ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_code', 'like', "%{$search}%")
+                    ->orWhere('bill_month', 'like', "%{$search}%")
+                    ->orWhereHas('rooms', function ($qu) use ($search) {
+                        $qu->where('room_name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('contracts.tenants', function ($que) use ($search) {
+                        $que->where('phone', 'like', "%{$search}%");
+                    });
+            });
+        });
+        
+        $query->when($filter !== '', function($qu) use ($filter){
+            $qu->where('status',$filter);
+        });
+
+        $invoices = $query->with('rooms', 'contracts.tenants', 'invoice_details.services')
+            ->orderBy('created_at', 'desc')->paginate(8);
         return response()->json([
             'message' => 'Tải danh sách hóa đơn thành công.',
             'data' => $invoices
@@ -61,27 +88,32 @@ class InvoiceController extends Controller
             'bill_month' => 'required|date_format:Y-m'
         ]);
 
-        $currentMonth=now()->format('Y-m');
-        if($validated['bill_month'] < $currentMonth){
-            return response()->json([
-                'message' => 'Không thể lập hóa đơn cho tháng trước.'
-            ], 422);
-        }
-
-        $billMonth = $request->bill_month;
+        $billMonth = $validated['bill_month'];
 
         $contracts = Contract::with('rooms', 'contract_services.services', 'room_members')->where('status', 0)->get();
         $data = [];
 
         foreach ($contracts as $contract) {
-            $isExist = Invoice::where('contract_id', $contract->id)->where('bill_month', $validated['bill_month'])->exists();
-            if ($isExist) continue;
+
+            $startMonth = $contract->start_date->format('Y-m');
+            $endMonth = $contract->end_date->format('Y-m');
+
+            if ($billMonth < $startMonth || $billMonth > $endMonth) {
+                continue;
+            }
+
+            $hasInvoice = Invoice::where('contract_id', $contract->id)->where('bill_month', '>=', $billMonth)->exists();
+
+            if ($hasInvoice) {
+                continue;
+            }
 
             $memberCount = 1;
             if ($contract->room_members) $memberCount += $contract->room_members->count();
 
             $serviceData = [];
-            $contractServices= $contract->contract_services->sortBy('service_id');
+            $contractServices = $contract->contract_services->sortBy('service_id');
+
             foreach ($contractServices as $contractService) {
                 $serviceData[] = [
                     'service_id' => $contractService->service_id,
@@ -96,7 +128,6 @@ class InvoiceController extends Controller
                 'room_id' => $contract->rooms->id,
                 'room_name' => $contract->rooms->room_name,
                 'room_price' => $contract->rent_price,
-                'deposit' => $contract->deposit,
                 'member_count' => $memberCount,
                 'services' => $serviceData
             ];
@@ -114,7 +145,7 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
-        if (!$user || $user->role !== 0) {
+        if (!$user || (int)$user->role !== 0) {
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
 
@@ -131,7 +162,7 @@ class InvoiceController extends Controller
         ], [
             'bill_month.required' => 'Tháng tính hóa đơn không được bỏ trống.',
             'due_date.required' => 'Hạn đóng tiền không được bỏ trống.',
-            'due_date.after_or_equal'=> 'Hạn đóng tiền phải từ hôm nay trở đi.',
+            'due_date.after_or_equal' => 'Hạn đóng tiền phải từ hôm nay trở đi.',
             'data.required' => 'Danh sách dữ liệu phòng tính tiền không được rỗng.'
         ]);
 
@@ -142,10 +173,11 @@ class InvoiceController extends Controller
                 $dueDate = $validated['due_date'];
                 $listInvoice = [];
                 foreach ($validated['data'] as $data) {
-                    //tại vì fe gửi lên data.*.contract_id nên $data['contract_id']
-                    $contract = Contract::with('rooms', 'room_members')->find($data['contract_id']);
 
-                    if (!$contract || $contract->status !== 0) {
+                    $contract = Contract::with('rooms', 'room_members', 'tenants')->where('id', $data['contract_id'])
+                        ->lockForUpdate()->first();
+
+                    if (!$contract || (int)$contract->status !== 0) {
                         throw new \Exception('Hợp đồng không còn hiệu lực.');
                     }
 
@@ -153,7 +185,15 @@ class InvoiceController extends Controller
                         throw new \Exception('Hợp đồng không thuộc phòng này.');
                     }
 
-                    $isExist = Invoice::where('contract_id', $data['contract_id'])->where('bill_month', $billMonth)->exists();
+                    $hasLaterInvoice = Invoice::where('contract_id', $contract->id)
+                        ->where('bill_month', '>', $billMonth)->exists();
+                    if ($hasLaterInvoice) {
+                        throw new \Exception(
+                            'Không thể lập hóa đơn tháng cũ vì hợp đồng đã có hóa đơn tháng sau.'
+                        );
+                    }
+
+                    $isExist = Invoice::where('contract_id', $contract->id)->where('bill_month', $billMonth)->exists();
                     if ($isExist) continue;
 
                     $roomPriceSnap = $contract->rent_price;
@@ -165,14 +205,14 @@ class InvoiceController extends Controller
 
                     foreach ($data['services'] as $service) {
 
-                        $contractService=Contract_Service::with('services')->where('service_id',$service['service_id'])
-                        ->where('contract_id',$contract->id)->first();
+                        $contractService = Contract_Service::with('services')->where('service_id', $service['service_id'])
+                            ->where('contract_id', $contract->id)->first();
 
-                        if(!$contractService){
+                        if (!$contractService) {
                             throw new \Exception('Dịch vụ không thuộc hợp đồng này.');
                         }
 
-                        $servicesObject= $contractService->services;
+                        $servicesObject = $contractService->services;
                         $oldIndex = $contractService->current_index;
                         $newIndex = $service['new_index'] ?? null;
 
@@ -208,11 +248,11 @@ class InvoiceController extends Controller
 
                         if ($chargeType === 1 && $newIndex !== null) {
                             $contractService->update([
-                                'current_index'=>$newIndex
+                                'current_index' => $newIndex
                             ]);
                         }
                     }
-                    
+
                     $totalAmount = $roomPriceSnap + $totalServices;
 
                     $invoice = Invoice::create([
@@ -250,7 +290,7 @@ class InvoiceController extends Controller
                             'title' => 'Hóa đơn tiền nhà tháng ' . date('m/Y', strtotime($billMonth)),
                             'content' => 'Hóa đơn số ' . $invoice->invoice_code . '. Vui lòng thanh toán trước ngày ' . date('d/m/Y', strtotime($dueDate)) .
                                 ' Mọi thắc mắc vui lòng liên hệ chủ nhà !',
-                            'type' => 1,
+                            'type' => 2,
                             'target_type' => 0
                         ]);
                         $notiUser = Notification_User::create([
@@ -264,13 +304,13 @@ class InvoiceController extends Controller
             });
             return response()->json([
                 'message' => 'Phát hành hóa đơn hàng loạt thành công.',
-                'total_issued' => count($invoices) // Trả về số lượng hóa đơn chính xác
+                'total_issued' => count($invoices)
             ], 201);
         } catch (Throwable $e) {
             return response()->json([
                 'message' => 'Có lỗi xảy ra. Vui lòng thử lại',
                 'error' => $e->getMessage()
-            ], 500);
+            ], 422);
         }
     }
 
@@ -320,27 +360,6 @@ class InvoiceController extends Controller
             return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
         }
 
-        $invoice = Invoice::find($id);
-
-        if (!$invoice) {
-            return response()->json([
-                'message' => 'Không tìm thấy hóa đơn này.'
-            ], 404);
-        }
-
-        if($invoice->paid_amount > 0){
-            return response()->json([
-                'message' => 'Không thể sửa hóa đơn đã thanh toán'
-            ], 400);
-        }
-
-        $hasLaterInvoice=Invoice::where('contract_id',$invoice->contract_id)->where('bill_month','>',$invoice->bill_month)->exists();
-        if($hasLaterInvoice){
-            return response()->json([
-                'message' => 'Không thể sửa vì đã có hóa đơn của tháng tiếp theo.'
-            ], 400);
-        }
-        
         $validated = $request->validate([
             'note' => 'nullable|string|max:191',
             'services' => 'required|array|min:1',
@@ -348,26 +367,39 @@ class InvoiceController extends Controller
             'services.*.new_index' => 'nullable|integer|min:0',
         ]);
         try {
+            $invoice = DB::transaction(function () use ($id, $validated) {
 
-            DB::transaction(function () use ($invoice, $validated) {
+                $invoice = Invoice::where('id', $id)->lockForUpdate()->first();
+                if (!$invoice) {
+                    throw new \Exception("Không tìm thấy hóa đơn này.");
+                }
+
+                $hasPayment = $invoice->payments()->whereIn('status', [0, 1])->exists();
+
+                if ((int) $invoice->status !== 0 || $hasPayment) {
+                    throw new \Exception("Không thể sửa hóa đơn đã phát sinh thanh toán hoặc đang chờ duyệt.");
+                }
+
+                $hasLaterInvoice = Invoice::where('contract_id', $invoice->contract_id)
+                    ->where('bill_month', '>', $invoice->bill_month)->exists();
+                if ($hasLaterInvoice) {
+                    throw new \Exception("Không thể sửa vì đã có hóa đơn của tháng tiếp theo.");
+                }
+
                 $totalServicecs = 0;
                 foreach ($validated['services'] as $service) {
 
                     $newIndex = $service['new_index'] ?? null;
 
-                    $memberCount = 1;
-                    $memberCount += $invoice->contracts->room_members->count();
                     $total = 0;
 
-                    //2 whwere vì nếu chỉ có cái invoice thì lúc nào nó cũng lấy dòng đầu tiên của invoices
-                    $invoiceDetail = Invoice_Detail::where('invoice_id', $invoice->id)
-                        ->where('service_id', $service['service_id'])->first();
+                    $invoiceDetail = Invoice_Detail::where('invoice_id', $invoice->id)->where('service_id', $service['service_id'])->first();
 
                     if (!$invoiceDetail) {
                         throw new \Exception('Không tìm thấy hóa đơn chi tiết.');
                     }
 
-                    $oldIndex=$invoiceDetail->old_index;
+                    $oldIndex = $invoiceDetail->old_index;
 
                     if ($invoiceDetail->services->charge_type === 0) {
                         $total = $invoiceDetail->unit_price_snapshot;
@@ -381,12 +413,12 @@ class InvoiceController extends Controller
                         if ($oldIndex > $newIndex) {
                             throw new \Exception('Chỉ số mới không được nhỏ hơn chỉ số cũ.');
                         }
-                        
+
                         $total = ($newIndex - $oldIndex) * $invoiceDetail->unit_price_snapshot;
                     }
 
                     if ($invoiceDetail->services->charge_type === 2) {
-                        $total = $memberCount * $invoiceDetail->unit_price_snapshot;
+                        $total = $invoiceDetail->subtotal;
                     }
 
                     $totalServicecs += $total;
@@ -397,13 +429,9 @@ class InvoiceController extends Controller
                         'subtotal' => $total
                     ]);
 
-                    //phải có where contracts vì nếu nhiều hợp đồng cùng dùng điện thì sẽ lấy nhầm.
-
                     if ((int) $invoiceDetail->services->charge_type === 1) {
-                        $contractService = Contract_Service::where(
-                            'service_id',
-                            $service['service_id']
-                        )->where('contract_id', $invoice->contract_id)->first();
+                        $contractService = Contract_Service::where('service_id', $service['service_id'])
+                            ->where('contract_id', $invoice->contract_id)->first();
 
                         if ($contractService) {
                             $contractService->update([
@@ -435,7 +463,7 @@ class InvoiceController extends Controller
                 $noti = Notification::create([
                     'title' => 'Cập nhật hóa đơn số ' . $invoice->invoice_code,
                     'content' => 'Vui lòng kiểm tra lại hóa đơn chi tiết.',
-                    'type' => 0,
+                    'type' => 2,
                     'target_type' => false
                 ]);
 
@@ -446,6 +474,7 @@ class InvoiceController extends Controller
                         'user_id' => $tenant->user_id,
                     ]);
                 }
+                return $invoice;
             });
             return response()->json([
                 'message' => 'Cập nhật hóa đơn ' . $invoice->invoice_code . ' thành công.',
@@ -455,7 +484,7 @@ class InvoiceController extends Controller
             return response()->json([
                 'message' => 'Có lỗi xảy ra khi cố sửa hóa đơn này.',
                 'error' => $e->getMessage()
-            ], 500);
+            ], 422);
         }
     }
 
@@ -471,32 +500,44 @@ class InvoiceController extends Controller
             ], 403);
         }
 
-        $invoice = Invoice::find($id);
-
-        if (!$invoice) {
-            return response()->json([
-                'message' => 'Không tìm thấy hóa đơn này.'
-            ], 404);
-        }
-        if ($invoice->status !== 0) {
-            return response()->json([
-                'message' => 'Hóa đơn này không thể xóa. Chỉ có thể xóa khi ở trạng thái chờ thanh toán.'
-            ], 400);
-        }
-
         try {
+            DB::transaction(function () use ($id) {
+                $invoice = Invoice::with('invoice_details')->where('id',$id)->lockForUpdate()->first();
 
-            DB::transaction(function () use ($invoice) {
+                if (!$invoice) {
+                    throw new \Exception("Không tìm thấy hóa đơn này.");
+                }
+
+                if ($invoice->status !== 0) {
+                    throw new \Exception("Hóa đơn này không thể xóa. Chỉ có thể xóa khi ở trạng thái chờ thanh toán.");
+                }
+
+                if ($invoice->payments()->exists()) {
+                    throw new \Exception("Không thể xóa hóa đơn đã phát sinh lịch sử thanh toán.");
+                }
+
+                $hasLaterInvoice = Invoice::where('contract_id', $invoice->contract_id)
+                    ->where('bill_month', '>', $invoice->bill_month)->exists();
+                if ($hasLaterInvoice) {
+                    throw new \Exception("Không thể xóa hóa đơn vì hợp đồng đã có hóa đơn của tháng sau.");
+                }
+                foreach ($invoice->invoice_details as $detail) {
+                    if ($detail->service_id !== null && $detail->old_index !== null && $detail->new_index !== null) {
+                        Contract_Service::where('contract_id', $invoice->contract_id)
+                            ->where('service_id', $detail->service_id)->update([
+                                'current_index' => $detail->old_index,
+                            ]);
+                    }
+                }
+
                 $invoice->invoice_details()->delete();
-                $invoice->payments()->delete();
                 $invoice->delete();
             });
             return response()->json(['message' => 'Xóa hóa đơn chưa thanh toán thành công.'], 200);
         } catch (Throwable $e) {
             return response()->json([
-                'message' => 'Không thể xóa hóa đơn này.',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' =>  $e->getMessage()
+            ], 422);
         }
     }
 }

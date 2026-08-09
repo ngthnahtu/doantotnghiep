@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class NotificationController extends Controller
 {
-    
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -22,52 +22,53 @@ class NotificationController extends Controller
                 'message' => 'Không tìm thấy người dùng.'
             ], 404);
         }
-        $view = $request->query('view', 'manage');
+
+        $view = trim($request->view ?? 'manage');
+        $search = trim($request->search ?? '');
+        $filter= trim($request->filter ?? '');
 
         if ($view === 'bell') {
-            if ((int) $user->role === 1) {
-                $noti = Notification::where(function ($query) use ($user) {
-                    $query->where('target_type', true)
-                        ->orWhereHas('notification_users', function ($query) use ($user) {
-                            $query->where('user_id', $user->id);
+            if ($user->role === 1) {
+                $query = Notification::where(function ($q) use ($user) {
+                    $q->where('target_type', true)
+                        ->orWhereHas('notification_users', function ($qu) use ($user) {
+                            $qu->where('user_id', $user->id);
                         });
-                })
-                    ->with([
-                        'notification_users' => function ($query) use ($user) {
-                            $query->where('user_id', $user->id);
-                        }
-                    ])
-                    ->orderBy('created_at', 'desc')
-                    ->paginate(7);
+                });
             } else {
-                $noti = Notification::whereHas(
-                    'notification_users',
-                    function ($query) use ($user) {
-                        $query->where('user_id', $user->id);
-                    }
-                )
-                    ->with([
-                        'notification_users' => function ($query) use ($user) {
-                            $query->where('user_id', $user->id);
-                        }
-                    ])
-                    ->orderBy('created_at', 'desc')
-                    ->paginate(8);
+                $query = Notification::whereHas('notification_users', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
             }
         } else {
-            if ((int) $user->role !== 0) {
+
+            if ($user->role !== 0) {
                 return response()->json([
                     'message' => 'Bạn không có quyền truy cập trang quản lý này.'
                 ], 403);
             }
-
-            $noti = Notification::orderBy('created_at', 'desc')
-                ->paginate(8);
+            $query = Notification::query();
         }
+
+        $query->when($search !== '', function ($query) use ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%");
+            });
+        });
+        $query->when($filter !== '', function($qu) use($filter){
+            $qu->where('type',$filter);
+        });
+
+        $notifications = $query->with([
+            'notification_users' => function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            }
+        ])->orderBy('created_at', 'desc')->paginate(8);
 
         return response()->json([
             'message' => 'Tải danh sách thông báo thành công.',
-            'data' => $noti
+            'data' => $notifications
         ], 200);
     }
 
@@ -86,21 +87,22 @@ class NotificationController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:191',
-            'content' => 'nullable|string|max:255',
-            'type' => 'required|integer',
+            'content' => 'nullable|string|max:191',
+            'type' => 'required|integer|in:0,1,2,3,4',
             'target_type' => 'required|boolean',
             'user_id' => 'required_if:target_type,0,false|array|min:1',
             'user_id.*' => 'integer|distinct|exists:users,id'
         ], [
             'title.required' => 'Tiêu đề không được bỏ trống.',
             'title.max' => 'Tiêu đề không vượt quá 191 kí tự.',
-            'content.max' => 'Nội dung không được vượt quá 255 kí tự.',
+            'content.max' => 'Nội dung không được vượt quá 191 kí tự.',
             'type.required' => 'Loại thông báo không được bỏ trống.',
             'target_type.required' => 'Đối tượng gửi không được bỏ trống.',
             'user_id.required_if' => 'Vui lòng chọn danh sách người nhận.',
             'user_id.min' => 'Vui lòng chọn ít nhất một người nhận.',
             'user_id.*.distinct' => 'Danh sách người nhận đang bị trùng.',
-            'user_id.*.exists' => 'Người nhận được chọn không tồn tại.'
+            'user_id.*.exists' => 'Người nhận được chọn không tồn tại.',
+            'type.in' => 'Loại thông báo không hợp lệ.',
         ]);
 
         $noti = DB::transaction(function () use ($validated) {
@@ -111,7 +113,7 @@ class NotificationController extends Controller
                 'target_type' => $validated['target_type']
             ]);
 
-        
+
             if (!$validated['target_type']) {
                 foreach ($validated['user_id'] as $userId) {
                     Notification_User::create([
@@ -154,12 +156,8 @@ class NotificationController extends Controller
 
         if ((int) $user->role !== 0) {
             if (!$noti->target_type) {
-                $canView = Notification_User::where(
-                    'notification_id',
-                    $noti->id
-                )
-                    ->where('user_id', $user->id)
-                    ->exists();
+                $canView = Notification_User::where('notification_id',$noti->id)
+                    ->where('user_id', $user->id)->exists();
 
                 if (!$canView) {
                     return response()->json([
@@ -200,13 +198,14 @@ class NotificationController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:191',
-            'content' => 'nullable|string|max:255',
-            'type' => 'required|integer'
+            'content' => 'nullable|string|max:191',
+            'type' => 'required|integer|in:0,1,2,3,4'
         ], [
             'title.required' => 'Tiêu đề không được bỏ trống.',
             'title.max' => 'Tiêu đề không vượt quá 191 kí tự.',
-            'content.max' => 'Nội dung không được vượt quá 255 kí tự.',
-            'type.required' => 'Loại thông báo không được bỏ trống.'
+            'content.max' => 'Nội dung không được vượt quá 191 kí tự.',
+            'type.required' => 'Loại thông báo không được bỏ trống.',
+            'type.in' => 'Loại thông báo không hợp lệ.',
         ]);
 
         $noti->update($validated);
@@ -258,11 +257,7 @@ class NotificationController extends Controller
             ], 403);
         }
 
-        $users = User::with('tenants')
-            ->where('role', 1)
-            ->where('is_active', true)
-            ->orderBy('id')
-            ->get();
+        $users = User::with('tenants')->where('role', 1)->where('is_active', true)->orderBy('id')->get();
 
         return response()->json([
             'message' => 'Tải danh sách người nhận thành công.',

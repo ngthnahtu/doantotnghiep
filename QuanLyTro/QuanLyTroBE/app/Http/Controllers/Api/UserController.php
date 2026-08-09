@@ -18,7 +18,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::orderBy('id','asc')->paginate(8);
+        $users = User::orderBy('id', 'asc')->paginate(8);
         return response()->json([
             'message' => 'Tải danh sách người dùng thành công.',
             'data' => $users
@@ -94,7 +94,7 @@ class UserController extends Controller
                 'message' => 'Không tìm thấy tài khoản này.'
             ], 404);
         }
-        // tenants? neu null thi kh chay, con co thì mới ->id tránh lỗi
+
         $tenantID = $user->tenants?->id;
         $validated = $request->validate(
             [
@@ -129,9 +129,13 @@ class UserController extends Controller
             unset($validated['password']);
         }
 
-        try{
+        try {
             DB::transaction(function () use ($user, $validated) {
                 $user->update($validated);
+                if (!$validated['is_active']) {
+                    $user->tokens()->delete();
+                }
+                
                 $tenant = Tenant::where('user_id', $user->id)->first();
                 if ($tenant) {
                     $tenant->update([
@@ -144,14 +148,12 @@ class UserController extends Controller
                 'message' => "Cập nhật thông tin tài khoản {$user->phone} thành công.",
                 'data' => $user->load('tenants')
             ], 200);
-        }
-        catch(Throwable $e){
+        } catch (Throwable $e) {
             return response()->json([
-                'message'=>'Cập nhật tài khoản thất bại.',
-                'error'=>$e->getMessage()
-            ],500);
+                'message' => 'Cập nhật tài khoản thất bại.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
     }
 
     /**
@@ -159,33 +161,37 @@ class UserController extends Controller
      */
     public function destroy(string $id)
     {
-        $user = User::find($id);
-
-        $users = Auth::user();
-        if (!$users || $user->role !== 0) {
-            return response()->json(['message' => 'Bạn không có quyền truy cập.'], 403);
+        $authUser = Auth::user();
+        if (!$authUser || (int) $authUser->role !== 0) {
+            return response()->json([
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 403);
         }
 
-        if (!$user) {
+        $targetUser = User::find($id);
+        if (!$targetUser) {
             return response()->json([
                 'message' => 'Không tìm thấy tài khoản này.'
             ], 404);
         }
-        if ($user->tenants()->exists()) {
-            return response()->json([
-                'message' => 'Không thể xóa tài khoản này do đang liên kết với khách thuê.'
-            ], 422);
-        }
-        if ($user->role == 0) {
+
+        if ((int)$targetUser->role === 0) {
             return response()->json([
                 'message' => 'Không thể xóa tài khoản Quản trị.'
             ], 422);
         }
-        $userName = $user->phone;
 
-        $user->delete();
+        if ($targetUser->tenants()->exists()) {
+            return response()->json([
+                'message' => 'Không thể xóa tài khoản này do đang liên kết với khách thuê.'
+            ], 422);
+        }
+
+        $phone = $targetUser->phone;
+        $targetUser->delete();
+
         return response()->json([
-            'message' => "Xóa tài khoản {$userName} thành công."
-        ], 200);
+            'message' => "Xóa tài khoản {$phone} thành công."
+        ]);
     }
 }
