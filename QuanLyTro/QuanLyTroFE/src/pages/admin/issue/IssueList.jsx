@@ -78,7 +78,7 @@ export default function IssueList() {
     try {
       setIsLoading(true);
 
-      const response = await getIssues(page,search, filter);
+      const response = await getIssues(page, search, filter);
 
       setIssues(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -432,7 +432,7 @@ export default function IssueList() {
                   }))
                 }
                 rows={3}
-                maxLength={255}
+                maxLength={191}
                 placeholder="Nhập ghi chú xử lý..."
                 className="w-full rounded-xl border border-slate-300 p-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />

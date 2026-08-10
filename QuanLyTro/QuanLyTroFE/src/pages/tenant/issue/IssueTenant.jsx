@@ -80,7 +80,7 @@ export default function IssueTenant() {
     try {
       setIsLoading(true);
 
-      const response = await getIssues(page, keyword, filter);
+      const response = await getIssues(page, search, filter);
 
       setIssues(response.data.data.data || []);
       setTotalPage(response.data.data.last_page || 1);
@@ -229,13 +229,13 @@ export default function IssueTenant() {
           <Tbody>
             {isLoading ? (
               <Tr>
-                <td className="text-center" colSpan={5}>
+                <td className="text-center" colSpan={4}>
                   <Loading />
                 </td>
               </Tr>
             ) : issues.length === 0 ? (
               <Tr>
-                <td className="text-center text-lg p-3" colSpan={5}>
+                <td className="text-center text-lg p-3" colSpan={4}>
                   Bạn chưa báo cáo sự cố nào.
                 </td>
               </Tr>
@@ -300,7 +300,7 @@ export default function IssueTenant() {
                 value={form.description}
                 onChange={handleChange}
                 rows={3}
-                maxLength={255}
+                maxLength={191}
                 placeholder="Mô tả sự cố..."
                 className="w-full rounded-xl border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
