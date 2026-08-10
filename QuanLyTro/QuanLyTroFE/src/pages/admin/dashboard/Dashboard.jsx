@@ -138,7 +138,7 @@ export default function Dashboard() {
                 </div>
 
                 <span className="text-sm text-slate-400">
-                  Mới cập nhật
+                  Mới nhất
                 </span>
               </div>
 
@@ -193,7 +193,7 @@ export default function Dashboard() {
                 </div>
 
                 <span className="text-sm text-slate-400">
-                  Mới cập nhật
+                  Mới nhất
                 </span>
               </div>
 

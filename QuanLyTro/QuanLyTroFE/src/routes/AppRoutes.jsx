@@ -7,7 +7,6 @@ import InvoiceList from "../pages/admin/invoice/InvoiceList";
 import IssueList from "../pages/admin/issue/IssueList";
 import NotificationList from "../pages/admin/notification/NotificationList";
 import PaymentList from "../pages/admin/payment/PaymentList";
-import Report from "../pages/admin/report/Report";
 import RoomList from "../pages/admin/room/RoomList";
 import ServiceList from "../pages/admin/service/ServiceList";
 import Setting from "../pages/admin/setting/Setting";
@@ -22,7 +21,6 @@ import NotFound from "../pages/NotFound";
 import Login from "../pages/auth/Login";
 import AdminLayout from "../layouts/AdminLayout";
 import TenantLayout from "../layouts/TenantLayout";
-import Toast from "../components/common/Toast";
 import InvoiceCreate from "../pages/admin/invoice/InvoiceCreate";
 
 export default function AppRoutes() {
@@ -44,7 +42,6 @@ export default function AppRoutes() {
 
             <Route path="/admin/notification" element={<NotificationList />} />
             <Route path="/admin/payment" element={<PaymentList />} />
-            <Route path="/admin/report" element={<Report />} />
             <Route path="/admin/room" element={<RoomList />} />
             <Route path="/admin/issue" element={<IssueList/>}/>
             <Route path="/admin/service" element={<ServiceList />} />

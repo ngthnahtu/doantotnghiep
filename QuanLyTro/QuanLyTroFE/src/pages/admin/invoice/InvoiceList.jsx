@@ -42,6 +42,7 @@ export default function InvoiceList() {
 
   const [isPayment, setIsPayment] = useState(null);
   const [formPayment, setFormPayment] = useState(initForm);
+  const [isPaying, setIsPaying]= useState(false);
 
   const [search, setSearch] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -126,6 +127,8 @@ export default function InvoiceList() {
   };
 
   const handleSavePayment = async () => {
+    if (isPaying) return;
+
     const amount = Number(formPayment.amount);
     const remainAmount = Number(isPayment.remain_amount);
 
@@ -147,6 +150,7 @@ export default function InvoiceList() {
     };
 
     try {
+      setIsPaying(true);
       const response = await createPayment(data);
 
       setIsPayment(null);
@@ -162,6 +166,9 @@ export default function InvoiceList() {
         type: "error",
         message: error.response?.data?.message || "Không thể tạo thanh toán.",
       });
+    }
+    finally{
+      setIsPaying(false);
     }
   };
   return (
@@ -331,6 +338,7 @@ export default function InvoiceList() {
             title="Thanh toán hóa đơn"
             isOpen={true}
             onClose={() => {
+              if(isPaying) return;
               setIsPayment(null);
               setFormPayment(initForm);
             }}
@@ -407,12 +415,13 @@ export default function InvoiceList() {
                   onClick={() => {
                     setIsPayment(null);
                     setFormPayment(initForm);
-                  }}>
+                  }}
+                  disabled={isPaying}>
                   Hủy
                 </Button>
 
-                <Button type="button" onClick={handleSavePayment}>
-                  Xác nhận thanh toán
+                <Button type="button" onClick={handleSavePayment} disabled={isPaying}>
+                  {isPaying ? "Đang xử lý..." : "Xác nhận thanh toán"}
                 </Button>
               </div>
             </div>
