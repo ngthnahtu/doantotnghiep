@@ -308,7 +308,7 @@ class PaymentController extends Controller
             return response()->json([
                 'message' => 'Xử lý phê duyệt thất bại.',
                 'error' => $e->getMessage()
-            ], 500);
+            ], 422);
         }
     }
 

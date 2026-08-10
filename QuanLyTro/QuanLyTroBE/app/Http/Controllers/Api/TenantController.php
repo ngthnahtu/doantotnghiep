@@ -59,7 +59,7 @@ class TenantController extends Controller
         }
         $validated = $request->validate([
             'name' => 'required|string|max:191',
-            'birth' => 'required|date',
+            'birth' => 'required|date|before_or_equal:today',
             'gender' => 'required|integer|in:0,1',
             'address' => 'required|string|max:191',
             'phone' => [
@@ -70,7 +70,12 @@ class TenantController extends Controller
                 'unique:users,phone',
                 Rule::unique('tenants', 'phone')->whereNull('deleted_at')
             ],
-            'identity_number' => 'required|string|max:50|unique:tenants,identity_number',
+            'identity_number' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('tenants','identity_number')->whereNull('deleted_at')
+            ],
             'password' => 'required|string|min:6',
             'email' => 'nullable|email|max:191',
         ], [
@@ -85,6 +90,7 @@ class TenantController extends Controller
             'password.min' => 'Mật khẩu phải chứa ít nhất 6 ký tự.',
             'email.email' => 'Định dạng email không hợp lệ.',
             'gender.in' => 'Giới tính không hợp lệ.',
+            'birth.before_or_equal'=>'Ngày sinh không được lớn hơn hôm nay.'
         ]);
 
         $tenant = DB::transaction(function () use ($validated) {
@@ -109,7 +115,6 @@ class TenantController extends Controller
         });
         return response()->json([
             'message' => "Thêm khách thuê {$tenant->name} mới và tạo tài khoản thành công",
-            // Trả về lồng luôn data User cho Frontend hiển thị
             'data' => $tenant->load('users')
         ], 201);
     }
@@ -155,7 +160,7 @@ class TenantController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:191',
-            'birth' => 'required|date',
+            'birth' => 'required|date|before_or_equal:today',
             'gender' => 'required|integer|in:0,1',
             'address' => 'required|string|max:191',
             'phone' => [
@@ -164,13 +169,13 @@ class TenantController extends Controller
                 'max:15',
                 'regex:/^(0)[0-9]{9,14}$/',
                 Rule::unique('users', 'phone')->ignore($tenant->user_id, 'id'),
-                Rule::unique('tenants', 'phone')->ignore($tenant->id, 'id')
+                Rule::unique('tenants', 'phone')->ignore($tenant->id, 'id')->whereNull('deleted_at')
             ],
             'identity_number' => ['required', 'string', 'max:50', Rule::unique('tenants', 'identity_number')->ignore($id)->whereNull('deleted_at')],
             'status' => 'required|integer|in:0,1,2',
             'email' => 'nullable|email|max:191',
             'password' => 'nullable|string|min:6',
-            'is_active' => 'required|boolean'
+            'is_active' => 'required|boolean',
         ], [
             'name.required' => 'Tên khách thuê không được để trống.',
             'birth.required' => 'Ngày sinh không được để trống.',
@@ -185,6 +190,7 @@ class TenantController extends Controller
             'gender.in' => 'Giới tính không hợp lệ.',
             'status.in' => 'Trạng thái khách thuê không hợp lệ.',
             'is_active.boolean' => 'Trạng thái tài khoản không hợp lệ.',
+            'birth.before_or_equal'=>'Ngày sinh không được lớn hơn hôm nay.'
         ]);
         try {
             $hasContractActive = $tenant->contracts()->where('status', 0)->exists();
