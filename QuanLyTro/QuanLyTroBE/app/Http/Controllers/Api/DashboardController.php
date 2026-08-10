@@ -56,35 +56,58 @@ class DashboardController extends Controller
         ], 200);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function revenue(Request $request)
     {
-        //
-    }
+        $user = Auth::user();
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
+        if (!$user || $user->role !== 0) {
+            return response()->json([
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 403);
+        }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
+        $year = (int) ($request->year ?? now()->year);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+        $monthlyRevenue = Payment::where('status', 1)->whereYear('approved_at', $year)
+            ->selectRaw('MONTH(approved_at) as month, SUM(amount) as revenue')
+            ->groupByRaw('MONTH(approved_at)')
+            ->orderByRaw('MONTH(approved_at)')
+            ->get();
+
+        $totalRevenue = $monthlyRevenue->sum('revenue');
+
+        return response()->json([
+            'message' => 'Tải thống kê doanh thu thành công.',
+            'data' => [
+                'year' => $year,
+                'total_revenue' => $totalRevenue,
+                'monthly_revenue' => $monthlyRevenue,
+            ],
+        ], 200);
+    }
+    public function revenueHistory(Request $request)
     {
-        //
+        $user = Auth::user();
+
+        if (!$user || $user->role !== 0) {
+            return response()->json([
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 403);
+        }
+
+        $year = (int) ($request->year ?? now()->year);
+        $month = trim($request->month ?? '');
+
+        $payments = Payment::with(['invoices.rooms', 'invoices.contracts.tenants'])->where('status', 1)
+            ->whereYear('approved_at', $year)
+            ->when($month !== '',function ($query) use ($month) {
+                    $query->whereMonth('approved_at',$month);
+                }
+            )->orderBy('approved_at', 'desc')->paginate(8);
+            
+        return response()->json([
+            'message' => 'Tải lịch sử doanh thu thành công.',
+            'data' => $payments
+        ], 200);
     }
 }
