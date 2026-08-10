@@ -37,12 +37,7 @@ class SettingController extends Controller
         $user = User::findOrFail(Auth::id());
 
         $rules = [
-            'email' => [
-                'nullable',
-                'email',
-                'max:191',
-                Rule::unique('users', 'email')->ignore($user->id),
-            ],
+            'email' => 'nullable|email|max:191',
         ];
         if ((int) $user->role === 0) {
             $rules['phone'] = [
@@ -59,7 +54,6 @@ class SettingController extends Controller
             'phone.unique' => 'Số điện thoại đã được sử dụng.',
             'phone.max' => 'Số điện thoại không hợp lệ.',
             'email.email' => 'Email không đúng định dạng.',
-            'email.unique' => 'Email đã được sử dụng.',
             'phone.regex' => 'Số điện thoại phải bắt đầu bằng số 0, có từ 10 đến 15 chữ số và chỉ chứa số.',
         ]);
 
