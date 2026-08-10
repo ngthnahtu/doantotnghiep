@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Bed,
+  ChevronRight,
   CircleDollarSign,
   DoorOpen,
   Gauge,
@@ -16,6 +17,7 @@ import Loading from "../../../components/common/Loading";
 import Toast from "../../../components/common/Toast";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { formatDate } from "../../../utils/formatDate";
+import { useNavigate } from "react-router-dom";
 
 const issueStatus = ["Chờ tiếp nhận", "Đang xử lý", "Đã xử lý"];
 
@@ -31,6 +33,8 @@ export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState(null);
+
+  const navigate= useNavigate();
 
   useEffect(() => {
     fetchDashboard();
@@ -99,17 +103,18 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-4 gap-4">
             <DashboardCard
-              title="Khách đang thuê"
-              value={dashboard?.total_tenants || 0}
-              icon={Users}
-              color="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
-            />
-
-            <DashboardCard
               title="Doanh thu tháng"
               value={formatCurrency(dashboard?.revenue_month || 0)}
               icon={CircleDollarSign}
               color="bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-300"
+              onClick={()=>navigate("/admin/revenue")}
+            />
+
+            <DashboardCard
+              title="Khách đang thuê"
+              value={dashboard?.total_tenants || 0}
+              icon={Users}
+              color="bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"
             />
 
             <DashboardCard
@@ -250,9 +255,11 @@ export default function Dashboard() {
   );
 }
 
-function DashboardCard({ title, value, icon: Icon, color }) {
+function DashboardCard({ title, value, icon: Icon, color, onClick }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className={`flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm 
+    dark:border-slate-700 dark:bg-slate-900 ${onClick? "hover:shadow-md hover:bg-slate-100" : ""}`}
+    onClick={onClick}>
       <div className="min-w-0">
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {title}
@@ -261,6 +268,12 @@ function DashboardCard({ title, value, icon: Icon, color }) {
         <p className="mt-1 truncate text-2xl font-semibold text-slate-800 dark:text-slate-100">
           {value}
         </p>
+        {onClick && (
+          <div className="mt-1 flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+            <span>Xem chi tiết</span>
+            <ChevronRight size={14} />
+          </div>
+        )}
       </div>
 
       <div className={`ml-3 shrink-0 rounded-xl p-3 ${color}`}>

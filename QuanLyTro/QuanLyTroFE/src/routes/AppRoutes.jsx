@@ -22,6 +22,7 @@ import Login from "../pages/auth/Login";
 import AdminLayout from "../layouts/AdminLayout";
 import TenantLayout from "../layouts/TenantLayout";
 import InvoiceCreate from "../pages/admin/invoice/InvoiceCreate";
+import Revenue from "../pages/admin/revenue/Revenue";
 
 export default function AppRoutes() {
   return (
@@ -34,6 +35,7 @@ export default function AppRoutes() {
           
             <Route path="/admin" element={<Dashboard />} />
             <Route path="/admin/dashboard" element={<Dashboard />} />
+            <Route path="/admin/revenue" element={<Revenue/>}/>
 
             <Route path="/admin/contract" element={<ContractList />} />
             
