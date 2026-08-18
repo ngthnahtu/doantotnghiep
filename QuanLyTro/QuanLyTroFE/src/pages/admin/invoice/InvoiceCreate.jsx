@@ -179,7 +179,7 @@ export default function InvoiceCreate() {
                               {Number(service.charge_type) === 1 && (
                                 <div className="flex items-center gap-2">
                                   <input type="number" value={service.old_index ?? ""} readOnly
-                                    className="h-8 w-16 rounded-lg border bg-gray-100 text-center"/>
+                                    className="h-8 w-16 rounded-lg border bg-gray-100 text-center dark:text-black"/>
 
                                   <MoveRight size={18} />
 

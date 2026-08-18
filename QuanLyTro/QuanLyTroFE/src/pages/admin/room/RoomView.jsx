@@ -15,7 +15,7 @@ export default function RoomView({ viewingRoom, onClose }) {
           <img
             src={getRoomImageUrl(viewingRoom.image)}
             alt={`Phòng ${viewingRoom.room_name}`}
-            className="h-60 w-60 shrink-0 rounded-lg border object-cover dark:border-slate-700"
+            className="h-80 w-120 shrink-0 rounded-lg border object-cover dark:border-slate-700"
           />
         ) : (
           <div className="flex h-60 w-60 shrink-0 items-center justify-center rounded-lg border bg-slate-100 p-4 text-center text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
