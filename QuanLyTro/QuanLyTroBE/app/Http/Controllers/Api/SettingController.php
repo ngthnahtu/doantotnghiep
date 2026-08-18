@@ -16,7 +16,6 @@ class SettingController extends Controller
     public function show()
     {
         $user = User::findOrFail(Auth::id());
-
         $system = Setting::query()->first();
 
         return response()->json([
@@ -60,6 +59,7 @@ class SettingController extends Controller
         if ((int) $user->role === 0) {
             $user->phone = $validated['phone'];
         }
+        
         $user->email = $validated['email'] ?? null;
 
         $user->save();

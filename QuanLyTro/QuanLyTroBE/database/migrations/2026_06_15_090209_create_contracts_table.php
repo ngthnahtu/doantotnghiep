@@ -22,7 +22,7 @@ return new class extends Migration
             $table->decimal('returned_deposit',12,2)->nullable();
             $table->tinyInteger('status')->default(0);
             $table->string('note')->nullable();
-            // restrictt ngăn không cho xóa, văng ra lỗi sql
+            
             $table->foreignId('room_id')->constrained('rooms')->onDelete('restrict');
             $table->foreignId('tenant_id')->constrained('tenants')->onDelete('restrict');
             $table->timestamps();

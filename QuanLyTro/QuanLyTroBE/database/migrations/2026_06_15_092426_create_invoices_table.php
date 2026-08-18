@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
             $table->string('invoice_code')->unique();
-            //  YYYY-MM cho bill
             $table->string('bill_month',7);
             $table->decimal('room_price_snapshot',12,2);
             $table->decimal('total_amount',12,2);

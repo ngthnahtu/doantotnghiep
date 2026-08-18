@@ -17,7 +17,9 @@ class AuthController extends Controller
             'phone.required' => 'Số điện thoại không được để trống.',
             'password.required' => 'Mật khẩu không được để trống.',
         ]);
-        $user=User::where('phone',$validated['phone'])->first();
+
+        $phone=trim($validated['phone']);
+        $user=User::where('phone',$phone)->first();
         
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             return response()->json([
@@ -30,7 +32,9 @@ class AuthController extends Controller
                 'message' => 'Tài khoản của bạn đã bị ngưng hoạt động.'
             ], 401);
         }
+        
         $token=$user->createToken('Token')->plainTextToken;
+
         return response()->json([
             'message'=>'Đăng nhập thành công.',
             'access_token'=>$token,
