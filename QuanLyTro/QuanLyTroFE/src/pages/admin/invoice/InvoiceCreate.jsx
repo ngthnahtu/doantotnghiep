@@ -121,7 +121,7 @@ export default function InvoiceCreate() {
 
       <ContentLayout title="Lập hóa đơn hàng loạt">
         <div className="flex flex-col gap-3">
-          <div className="flex w-fit items-center gap-2 rounded-lg border p-2 dark:border-slate-700">
+          <div className="flex w-fit items-center gap-2 rounded-lg p-1">
             <Label htmlFor="bill_month">Tháng:</Label>
 
             <input
@@ -129,7 +129,7 @@ export default function InvoiceCreate() {
               type="month"
               value={billMonth}
               onChange={handleLoadData}
-              className="rounded-lg border p-1 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="rounded-lg border p-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
 

@@ -9,7 +9,7 @@
       <Modal title="Chi tiết khách thuê" isOpen={true} onClose={onClose}>
         <div className="flex max-h-[75vh] flex-col gap-6 overflow-y-auto pr-2">
           <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <TenantInfo label="Mã khách thuê (ID)" value={`#${viewingTenant.id}`} />
+            {/* <TenantInfo label="Mã khách thuê (ID)" value={`#${viewingTenant.id}`} /> */}
 
             <TenantInfo label="Họ và tên" value={viewingTenant.name} />
 
