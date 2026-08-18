@@ -29,7 +29,7 @@ class Notification_UserController extends Controller
                 'user_id' => $user->id,
                 'notification_id' => $notification->id
             ], [
-                'is_read' => 'true'
+                'is_read' => true
             ]);
         } else {
             $notification_user = Notification_User::where('notification_id', $notification->id)

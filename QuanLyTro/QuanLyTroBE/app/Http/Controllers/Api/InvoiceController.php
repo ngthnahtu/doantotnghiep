@@ -157,7 +157,7 @@ class InvoiceController extends Controller
             'data.*.contract_id' => 'required|integer|exists:contracts,id',
             'data.*.room_id' => 'required|integer|exists:rooms,id',
             'data.*.services' => 'required|array|min:1',
-            'data.*.services.*.service_id' => 'required|integer|distinct|exists:services,id',
+            'data.*.services.*.service_id' => 'required|integer|exists:services,id',
             'data.*.services.*.new_index' => 'nullable|integer|min:0'
         ], [
             'bill_month.required' => 'Tháng tính hóa đơn không được bỏ trống.',
@@ -284,7 +284,7 @@ class InvoiceController extends Controller
                         'contract_id' => $contract->id
                     ]);
 
-                    $invoiceCode = 'HD-' . date('Ym', strtotime($billMonth)) . "-" . str_pad($invoice->id, 4, 0, STR_PAD_LEFT);
+                    $invoiceCode = 'HD-' . date('Ym', strtotime($billMonth)) . "-" . str_pad($invoice->id, 6, 0, STR_PAD_LEFT);
                     $invoice->update([
                         'invoice_code' => $invoiceCode
                     ]);
@@ -386,6 +386,7 @@ class InvoiceController extends Controller
             $invoice = DB::transaction(function () use ($id, $validated) {
 
                 $invoice = Invoice::where('id', $id)->lockForUpdate()->first();
+                
                 if (!$invoice) {
                     throw new \Exception("Không tìm thấy hóa đơn này.");
                 }

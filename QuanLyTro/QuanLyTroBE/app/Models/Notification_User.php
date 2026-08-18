@@ -11,7 +11,8 @@ class Notification_User extends Model
     protected $fillable = ['is_read','notification_id','user_id'];
     protected $casts = [
         'notification_id'=>'integer',
-        'user_id'=>'integer'
+        'user_id'=>'integer',
+        'is_read' => 'boolean',
         ];
     public function notifications():BelongsTo
     {
